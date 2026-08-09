@@ -13,6 +13,8 @@
 ## Cilium Installation (via Helm)
 
 ```bash
+helm repo add cilium https://helm.cilium.io/
+
 helm upgrade --install cilium cilium/cilium -n kube-system \
 --version 1.18.4 \
 --set cluster.name=kind-kind \
