@@ -3,33 +3,22 @@
 # setup-ubuntu.sh — Prepare an Ubuntu host for the Cilium & eBPF course labs.
 #
 # Installs: Docker Engine, kubectl, kind, helm, cilium-cli, hubble-cli
-# Creates : a 3-node kind cluster with the default CNI disabled
+#
+# It does NOT create a cluster: each scenario creates its own kind cluster from
+# the config file in its folder.
 #
 # Tested on Ubuntu 22.04 / 24.04 (amd64, arm64).
 #
 # Usage:
-#   ./setup-ubuntu.sh                 # install tools + create the cluster
-#   ./setup-ubuntu.sh --tools-only    # install tools, skip the cluster
-#   ./setup-ubuntu.sh --cluster-only  # skip tools, create the cluster
-#   ./setup-ubuntu.sh --name mylab --config /path/to/kind.yaml
+#   ./setup-ubuntu.sh
 #
 set -euo pipefail
 
-CLUSTER_NAME="kind"
-KIND_CONFIG="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../scenario-1-installation-cilium/light-lab.yaml"
-DO_TOOLS=true
-DO_CLUSTER=true
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --tools-only)   DO_CLUSTER=false; shift ;;
-    --cluster-only) DO_TOOLS=false;   shift ;;
-    --name)         CLUSTER_NAME="$2"; shift 2 ;;
-    --config)       KIND_CONFIG="$2";  shift 2 ;;
-    -h|--help)      sed -n '2,20p' "${BASH_SOURCE[0]}"; exit 0 ;;
-    *) echo "unknown argument: $1" >&2; exit 1 ;;
-  esac
-done
+case "${1:-}" in
+  "") ;;
+  -h|--help) sed -n '2,14p' "${BASH_SOURCE[0]}"; exit 0 ;;
+  *) echo "unknown argument: $1" >&2; exit 1 ;;
+esac
 
 # ----------------------------------------------------------------------------
 # Helpers
@@ -59,7 +48,7 @@ if [[ -r /etc/os-release ]]; then
   [[ "${ID:-}" == "ubuntu" ]] || warn "not Ubuntu (${PRETTY_NAME:-unknown}) — continuing anyway."
 fi
 
-# A 3-node kind cluster running Cilium needs headroom.
+# Multi-node kind clusters running Cilium need headroom.
 CPUS=$(nproc)
 MEM_GB=$(( $(awk '/MemTotal/ {print $2}' /proc/meminfo) / 1024 / 1024 ))
 (( CPUS  >= 4 )) || warn "only ${CPUS} CPUs detected — 4+ recommended."
@@ -173,47 +162,23 @@ SYSCTL
   sudo sysctl -q --system
 }
 
-if [[ "$DO_TOOLS" == true ]]; then
-  install_docker
-  install_kubectl
-  install_kind
-  install_helm
-  install_cilium_style_cli "cilium-cli" "cilium/cilium-cli" "cilium"
-  install_cilium_style_cli "hubble-cli" "cilium/hubble"     "hubble"
-  tune_inotify
-fi
+install_docker
+install_kubectl
+install_kind
+install_helm
+install_cilium_style_cli "cilium-cli" "cilium/cilium-cli" "cilium"
+install_cilium_style_cli "hubble-cli" "cilium/hubble"     "hubble"
+tune_inotify
 
-# ----------------------------------------------------------------------------
-# Cluster
-# ----------------------------------------------------------------------------
-if [[ "$DO_CLUSTER" == true ]]; then
-  docker info >/dev/null 2>&1 \
-    || die "cannot talk to the Docker daemon. Run 'newgrp docker' (or re-login) and try again."
-  [[ -f "$KIND_CONFIG" ]] || die "kind config not found: ${KIND_CONFIG}"
-
-  if kind get clusters 2>/dev/null | grep -qx "$CLUSTER_NAME"; then
-    warn "kind cluster '${CLUSTER_NAME}' already exists — skipping creation."
-    warn "Delete it first with: kind delete cluster --name ${CLUSTER_NAME}"
-  else
-    info "Creating kind cluster '${CLUSTER_NAME}' from ${KIND_CONFIG}"
-    kind create cluster --name "$CLUSTER_NAME" --config "$KIND_CONFIG"
-  fi
-
-  info "Cluster nodes (NotReady is EXPECTED until Cilium is installed):"
-  kubectl get nodes -o wide || true
-  info "Pending pods (coredns / local-path-provisioner) are also expected:"
-  kubectl get pods -A || true
-
-  cat <<'NEXT'
+cat <<'NEXT'
 
 ------------------------------------------------------------------
-Environment ready.
+Tools installed. No cluster was created: each scenario creates the
+kind cluster it needs from the config file in its own folder.
 
-Nodes are NotReady and coredns is Pending on purpose: the kind
-config sets disableDefaultCNI: true, so the cluster has no CNI yet.
+If this run added you to the 'docker' group, run 'newgrp docker'
+(or log out and back in) before using kind.
 
 Next: scenario-1-installation-cilium/instructions-scenario-1.md
-      installs Cilium via Helm and the nodes turn Ready.
 ------------------------------------------------------------------
 NEXT
-fi

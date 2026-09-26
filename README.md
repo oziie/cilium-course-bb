@@ -26,8 +26,9 @@ By the end of the course, learners will be able to:
 ### Building the Lab Environment
 
 **[setup-ubuntu/](setup-ubuntu/)** — step-by-step instructions to install every CLI above
-and create the 3-node kind cluster on Ubuntu 22.04 / 24.04, plus an idempotent
-`setup-ubuntu.sh` that does it in one command:
+on Ubuntu 22.04 / 24.04, plus an idempotent `setup-ubuntu.sh` that does it in one command.
+Clusters are not created here: each scenario creates its own kind cluster from the config
+in its folder.
 
 ```bash
 cd setup-ubuntu && ./setup-ubuntu.sh
@@ -43,8 +44,8 @@ CLIs are pre-provisioned.
 **Setup — Preparing an Ubuntu Host**
 [setup-ubuntu/](setup-ubuntu/)
 
-Install Docker, kubectl, kind, Helm and the Cilium/Hubble CLIs, then create a 3-node kind
-cluster with the default CNI disabled — the starting point for every scenario below.
+Install Docker, kubectl, kind, Helm and the Cilium/Hubble CLIs — the tools every scenario
+below uses. Each scenario then creates the kind cluster it needs.
 
 ---
 

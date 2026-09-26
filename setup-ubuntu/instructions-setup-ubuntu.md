@@ -5,20 +5,23 @@
 > already provisioned — skip straight to
 > [Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md).
 
-Follow this page to build the lab environment on your own machine: a 3-node
-[kind](https://kind.sigs.k8s.io/) cluster **with no CNI installed**, ready for Cilium.
+Follow this page to install the lab tools on your own machine: Docker,
+[kind](https://kind.sigs.k8s.io/), kubectl, Helm and the Cilium/Hubble CLIs.
+
+This page does **not** create a cluster. Each scenario needs a different cluster layout,
+so every scenario folder ships its own kind config and creates its cluster at the start.
 
 **Tested on:** Ubuntu 22.04 LTS and 24.04 LTS (`amd64` and `arm64`).
 
-**Recommended resources:** 4 vCPU, 8 GiB RAM, 20 GiB free disk. A 3-node kind cluster
-running Cilium, Envoy and Hubble will struggle below that.
+**Recommended resources:** 4 vCPU, 8 GiB RAM, 20 GiB free disk. The scenarios' multi-node
+kind clusters running Cilium, Envoy and Hubble will struggle below that.
 
 ---
 
 ## Option A — Automated (recommended)
 
-The script installs every CLI and creates the cluster. It is idempotent: re-running it
-skips whatever is already present.
+The script installs every CLI. It is idempotent: re-running it skips whatever is already
+present.
 
 ```bash
 git clone https://github.com/<your-org>/cilium-course-bb.git
@@ -26,22 +29,12 @@ cd cilium-course-bb/setup-ubuntu
 ./setup-ubuntu.sh
 ```
 
-Because the script adds your user to the `docker` group, the very first run may stop and
-ask you to refresh your group membership. If it does:
+The script adds your user to the `docker` group, which only takes effect in a new login
+shell. Refresh it before using kind:
 
 ```bash
 newgrp docker           # or log out and back in
-./setup-ubuntu.sh --cluster-only
 ```
-
-Useful flags:
-
-| Flag | Effect |
-| --- | --- |
-| `--tools-only` | Install the CLIs, do not create a cluster |
-| `--cluster-only` | Skip the CLIs, only create the cluster |
-| `--name <name>` | Cluster name (default `kind`) |
-| `--config <path>` | kind config file (default `../scenario-1-installation-cilium/light-lab.yaml`) |
 
 Then jump to [Verify the Environment](#verify-the-environment).
 
@@ -174,65 +167,9 @@ SYSCTL
 sudo sysctl --system
 ```
 
-### 8. Create the kind cluster
-
-The cluster definition lives with Scenario 1 so both pages share one source of truth:
-
-```yaml
-# scenario-1-installation-cilium/light-lab.yaml
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-- role: control-plane
-- role: worker
-- role: worker
-networking:
-  disableDefaultCNI: true   # Disables kindnetd prior to Cilium install
-```
-
-One control-plane node plus two workers gives you two schedulable nodes, which is what
-Scenario 2 needs to show *internode* pod-to-pod traffic across the VXLAN tunnel.
-`disableDefaultCNI: true` removes kindnetd so Cilium can own the data plane.
-
-```bash
-cd cilium-course-bb
-kind create cluster --name kind --config scenario-1-installation-cilium/light-lab.yaml
-```
-
-> **Note:** kind writes the kubeconfig context automatically. Confirm you are pointed at
-> the right cluster with `kubectl config current-context` — it should print
-> `kind-kind`, which matches the `cluster.name=kind-kind` Helm value used in Scenario 1.
-
 ---
 
 ## Verify the Environment
-
-```bash
-$ kubectl get nodes
-NAME                 STATUS     ROLES           AGE   VERSION
-kind-control-plane   NotReady   control-plane   60s   v1.34.0
-kind-worker          NotReady   <none>          45s   v1.34.0
-kind-worker2         NotReady   <none>          45s   v1.34.0
-```
-
-```bash
-$ kubectl get pods -A
-NAMESPACE            NAME                                         READY   STATUS    RESTARTS
-kube-system          coredns-…                                    0/1     Pending   0
-kube-system          coredns-…                                    0/1     Pending   0
-kube-system          etcd-kind-control-plane                      1/1     Running   0
-kube-system          kube-apiserver-kind-control-plane            1/1     Running   0
-kube-system          kube-controller-manager-kind-control-plane   1/1     Running   0
-kube-system          kube-scheduler-kind-control-plane            1/1     Running   0
-local-path-storage   local-path-provisioner-…                     0/1     Pending   0
-```
-
-> **Note:** `NotReady` nodes and `Pending` coredns / local-path-provisioner pods are the
-> **expected** outcome, not a failure. The kubelet reports `NotReady` while no CNI plugin
-> is configured, so the scheduler refuses to place pods that need pod networking. Both
-> resolve in Scenario 1 the moment the Cilium agent starts.
-
-Checklist before moving on:
 
 ```bash
 docker --version
@@ -243,16 +180,22 @@ cilium version --client
 hubble version
 ```
 
+Confirm Docker works without `sudo` — kind needs this to create clusters:
+
+```bash
+docker run --rm hello-world
+```
+
 ---
 
 ## Teardown and Reset
 
-```bash
-# Delete the lab cluster
-kind delete cluster --name kind
+Each scenario creates its own cluster. To remove one when you are done:
 
-# Re-create it from scratch
-./setup-ubuntu/setup-ubuntu.sh --cluster-only
+```bash
+# List clusters, then delete one by name
+kind get clusters
+kind delete cluster --name kind
 
 # Reclaim disk used by cached node images
 docker system prune -a

@@ -10,11 +10,28 @@
 
 If you are building the lab on your own Ubuntu machine, follow
 [setup-ubuntu/instructions-setup-ubuntu.md](../setup-ubuntu/instructions-setup-ubuntu.md)
-first — it installs the prerequisite tools above and creates the cluster from
+first to install the prerequisite tools. Then create this scenario's cluster from
 [`light-lab.yaml`](light-lab.yaml):
 
+```yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+networking:
+  disableDefaultCNI: true   # Disables kindnetd prior to Cilium install
+```
+
+One control-plane node plus two workers gives two schedulable nodes, so later scenarios
+can show *internode* pod-to-pod traffic. `disableDefaultCNI: true` removes kindnetd so
+Cilium can own the data plane.
+
 ```bash
+cd scenario-1-installation-cilium
 kind create cluster --name kind --config light-lab.yaml
+kubectl config current-context   # should print kind-kind, matching cluster.name below
 ```
 
 > **Note:** coredns and localpath pods will be stuck in "Pending" state as default CNI is disabled. As a result, nodes will not be ready as well.
