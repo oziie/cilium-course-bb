@@ -99,3 +99,17 @@ $ kubectl get -n kube-system deployment cilium-operator
 NAME              READY   AVAILABLE
 cilium-operator   1/1     1
 ```
+
+## Cleanup (no need for BB)
+
+[Scenario 2](../scenario-2-pod-connectivity/instructions-scenario-2.md) runs on this
+cluster with Cilium already installed, so **keep it** if you are continuing.
+
+Delete it only when you are done with the lab or want to start over:
+
+```bash
+kind delete cluster --name kind
+```
+
+> **Note:** Deleting the cluster removes the Cilium installation with it. To come back,
+> re-run this scenario from [Create kind cluster](#create-kind-cluster-no-need-for-bb).

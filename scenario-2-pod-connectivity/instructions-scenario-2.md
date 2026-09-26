@@ -86,3 +86,21 @@ curl -s -o /dev/null \
 http://10.244.2.127
 200
 ```
+
+## Cleanup
+
+Remove the test applications:
+
+```bash
+kubectl delete -f app-nginx.yaml -f app-netshoot.yaml
+```
+
+If you are done with the lab, delete the cluster too (no need for BB):
+
+```bash
+kind delete cluster --name kind
+```
+
+> **Note:** This cluster was created and had Cilium installed in
+> [Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md). If you
+> delete it, re-run Scenario 1 before the next scenario.
