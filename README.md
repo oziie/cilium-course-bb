@@ -23,7 +23,30 @@ By the end of the course, learners will be able to:
 - `hubble` CLI
 - A running Kubernetes cluster (e.g. [kind](https://kind.sigs.k8s.io/))
 
+### Building the Lab Environment
+
+**[setup-ubuntu/](setup-ubuntu/)** — step-by-step instructions to install every CLI above
+and create the 3-node kind cluster on Ubuntu 22.04 / 24.04, plus an idempotent
+`setup-ubuntu.sh` that does it in one command:
+
+```bash
+cd setup-ubuntu && ./setup-ubuntu.sh
+```
+
+Learners on the Bulut Bilisimciler hosted environment can skip this — the cluster and
+CLIs are pre-provisioned.
+
 ## Course Content
+
+### Module 0 — Environment
+
+**Setup — Preparing an Ubuntu Host**
+[setup-ubuntu/](setup-ubuntu/)
+
+Install Docker, kubectl, kind, Helm and the Cilium/Hubble CLIs, then create a 3-node kind
+cluster with the default CNI disabled — the starting point for every scenario below.
+
+---
 
 ### Module 1 — Foundations
 
@@ -75,6 +98,9 @@ Enable Hubble and use the Hubble CLI and UI to inspect live network flows, ident
 
 ```
 .
+├── setup-ubuntu/
+│   ├── instructions-setup-ubuntu.md
+│   └── setup-ubuntu.sh
 ├── scenario-1-installation-cilium/
 │   ├── instructions-scenario-1.md
 │   └── light-lab.yaml
@@ -95,6 +121,7 @@ Enable Hubble and use the Hubble CLI and UI to inspect live network flows, ident
 ## References
 
 - [Cilium Documentation](https://docs.cilium.io)
+- [kind — Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/)
 - [eBPF.io](https://ebpf.io)
 - [Cilium GitHub](https://github.com/cilium/cilium)
 - [Hubble GitHub](https://github.com/cilium/hubble)

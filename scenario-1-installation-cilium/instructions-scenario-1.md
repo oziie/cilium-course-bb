@@ -8,6 +8,15 @@
 
 ## Create kind cluster (no need for BB)
 
+If you are building the lab on your own Ubuntu machine, follow
+[setup-ubuntu/instructions-setup-ubuntu.md](../setup-ubuntu/instructions-setup-ubuntu.md)
+first — it installs the prerequisite tools above and creates the cluster from
+[`light-lab.yaml`](light-lab.yaml):
+
+```bash
+kind create cluster --name kind --config light-lab.yaml
+```
+
 > **Note:** coredns and localpath pods will be stuck in "Pending" state as default CNI is disabled. As a result, nodes will not be ready as well.
 
 ## Cilium Installation (via Helm)
