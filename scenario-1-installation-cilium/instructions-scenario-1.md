@@ -28,11 +28,34 @@ One control-plane node plus two workers gives two schedulable nodes, so later sc
 can show *internode* pod-to-pod traffic. `disableDefaultCNI: true` removes kindnetd so
 Cilium can own the data plane.
 
+Create it with the [`create-kind-cluster.sh`](create-kind-cluster.sh) script in this
+folder:
+
 ```bash
 cd scenario-1-installation-cilium
-kind create cluster --name kind --config light-lab.yaml
+./create-kind-cluster.sh
 kubectl config current-context   # should print kind-kind, matching cluster.name below
 ```
+
+The script:
+
+- fails fast if Docker is unreachable or `docker`/`kind`/`kubectl` is missing
+- creates the cluster from `light-lab.yaml` (or reuses it if it already exists)
+- writes the `kind-kind` context to `$KUBECONFIG` (default `~/.kube/config`) and switches to it
+- waits for the API server and verifies the 1 control-plane + 2 worker layout
+
+Useful flags: `--recreate` to start fresh, `--image kindest/node:<tag>` to pin the
+Kubernetes version, `--delete` to remove the cluster. See `./create-kind-cluster.sh --help`.
+
+<details>
+<summary>Manual alternative</summary>
+
+```bash
+kind create cluster --name kind --config light-lab.yaml
+kubectl config use-context kind-kind
+```
+
+</details>
 
 > **Note:** coredns and localpath pods will be stuck in "Pending" state as default CNI is disabled. As a result, nodes will not be ready as well.
 
@@ -108,7 +131,7 @@ cluster with Cilium already installed, so **keep it** if you are continuing.
 Delete it only when you are done with the lab or want to start over:
 
 ```bash
-kind delete cluster --name kind
+./create-kind-cluster.sh --delete   # or: kind delete cluster --name kind
 ```
 
 > **Note:** Deleting the cluster removes the Cilium installation with it. To come back,

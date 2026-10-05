@@ -1,5 +1,24 @@
 **Scope:** Verify internode connectivity between two different applications that are scheduled on different Kubernetes nodes through Cilium's VXLAN-based tunneling.
 
+## Prepare the kind cluster (no need for BB)
+
+This scenario runs on the same cluster as the previous ones: 1 control-plane + 2 workers
+with Cilium installed. If you are continuing from the previous scenario, skip this section.
+
+Otherwise, create (or reuse) the cluster with the script in this folder:
+
+```bash
+cd scenario-2-pod-connectivity
+./create-kind-cluster.sh
+kubectl config current-context   # should print kind-kind
+```
+
+The script fails fast on errors, sets the `kind-kind` context in `$KUBECONFIG` (default
+`~/.kube/config`) and verifies the node layout. A freshly created cluster has **no CNI**:
+install Cilium by following
+[Scenario 1 — Cilium Installation](../scenario-1-installation-cilium/instructions-scenario-1.md#cilium-installation-via-helm)
+before continuing. Check it with `cilium status --wait`.
+
 ## Deploy nginx application on `kind-worker2` node
 
 ```yaml
@@ -98,9 +117,10 @@ kubectl delete -f app-nginx.yaml -f app-netshoot.yaml
 If you are done with the lab, delete the cluster too (no need for BB):
 
 ```bash
-kind delete cluster --name kind
+./create-kind-cluster.sh --delete   # or: kind delete cluster --name kind
 ```
 
-> **Note:** This cluster was created and had Cilium installed in
-> [Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md). If you
-> delete it, re-run Scenario 1 before the next scenario.
+> **Note:** Deleting the cluster removes the Cilium installation with it. The next
+> scenario can recreate it with its own `create-kind-cluster.sh`, after which Cilium
+> must be reinstalled as in
+> [Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md).

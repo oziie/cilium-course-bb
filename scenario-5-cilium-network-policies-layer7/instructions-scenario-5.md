@@ -1,3 +1,5 @@
+# Scenario 5 — Network Policies (Layer 7)
+
 ## Prepare the kind cluster (no need for BB)
 
 This scenario runs on the same cluster as the previous ones: 1 control-plane + 2 workers
@@ -6,7 +8,7 @@ with Cilium installed. If you are continuing from the previous scenario, skip th
 Otherwise, create (or reuse) the cluster with the script in this folder:
 
 ```bash
-cd scenario-3-service-connectivity
+cd scenario-5-cilium-network-policies-layer7
 ./create-kind-cluster.sh
 kubectl config current-context   # should print kind-kind
 ```

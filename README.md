@@ -27,8 +27,8 @@ By the end of the course, learners will be able to:
 
 **[setup-ubuntu/](setup-ubuntu/)** — step-by-step instructions to install every CLI above
 on Ubuntu 22.04 / 24.04, plus an idempotent `setup-ubuntu.sh` that does it in one command.
-Clusters are not created here: each scenario creates its own kind cluster from the config
-in its folder.
+Clusters are not created here: every scenario folder ships a `create-kind-cluster.sh`
+script and the kind config file it uses.
 
 ```bash
 cd setup-ubuntu && ./setup-ubuntu.sh
@@ -45,7 +45,23 @@ CLIs are pre-provisioned.
 [setup-ubuntu/](setup-ubuntu/)
 
 Install Docker, kubectl, kind, Helm and the Cilium/Hubble CLIs — the tools every scenario
-below uses. Each scenario then creates the kind cluster it needs.
+below uses.
+
+**Lab cluster**
+
+All scenarios has own kind cluster type but it's usualy with this architecture: 1 control-plane + 2 workers, default CNI
+disabled so Cilium owns the data plane. Each scenario folder contains a
+`create-kind-cluster.sh` that creates the kind cluster (or reuses an existing one), sets the `kind-kind`
+kubectl context in `$KUBECONFIG` and verifies the node layout:
+
+```bash
+cd scenario-1-installation-cilium
+./create-kind-cluster.sh            # --recreate | --delete | --image kindest/node:<tag>
+```
+
+Working through the scenarios in order, you only need to run it once in Scenario 1. Run it
+from a later scenario's folder to rebuild the cluster, then reinstall Cilium as in
+Scenario 1.
 
 ---
 
@@ -104,19 +120,33 @@ Enable Hubble and use the Hubble CLI and UI to inspect live network flows, ident
 │   └── setup-ubuntu.sh
 ├── scenario-1-installation-cilium/
 │   ├── instructions-scenario-1.md
+│   ├── create-kind-cluster.sh
 │   └── light-lab.yaml
 ├── scenario-2-pod-connectivity/
 │   ├── instructions-scenario-2.md
+│   ├── create-kind-cluster.sh
+│   ├── light-lab.yaml
 │   ├── app-nginx.yaml
 │   └── app-netshoot.yaml
 ├── scenario-3-service-connectivity/
 │   ├── instructions-scenario-3.md
+│   ├── create-kind-cluster.sh
+│   ├── light-lab.yaml
 │   ├── app-nginx.yaml
 │   ├── app-netshoot.yaml
 │   └── svc-nginx.yaml
 ├── scenario-4-cilium-network-policies/
+│   ├── instructions-scenario-4.md
+│   ├── create-kind-cluster.sh
+│   └── light-lab.yaml
 ├── scenario-5-cilium-network-policies-layer7/
+│   ├── instructions-scenario-5.md
+│   ├── create-kind-cluster.sh
+│   └── light-lab.yaml
 └── scenario-6-observability-with-hubble/
+    ├── instructions-scenario-6.md
+    ├── create-kind-cluster.sh
+    └── light-lab.yaml
 ```
 
 ## References
