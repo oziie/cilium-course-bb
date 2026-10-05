@@ -91,9 +91,9 @@ Test pod-to-Service connectivity through Cilium's kube-proxy replacement. Observ
 ### Module 3 — Network Policy
 
 **Scenario 4 — Network Policies (L3/L4)**
-[scenario-4-cilium-network-policies/](scenario-4-cilium-network-policies/)
+[scenario-4-cilium-network-policies-layer3-layer4/](scenario-4-cilium-network-policies-layer3-layer4/)
 
-Write and apply `CiliumNetworkPolicy` resources to control traffic at the IP and port level. Verify that ingress and egress rules are enforced correctly.
+Lock down a three-tier shop (`frontend` → `backend` → `database` namespaces) with `CiliumNetworkPolicy`: default-deny ingress, cross-namespace label selectors, per-port rules, and an egress policy that needs DNS allowed. Verify every path is allowed or blocked as intended.
 
 **Scenario 5 — Network Policies (Layer 7)**
 [scenario-5-cilium-network-policies-layer7/](scenario-5-cilium-network-policies-layer7/)
@@ -135,10 +135,19 @@ Enable Hubble and use the Hubble CLI and UI to inspect live network flows, ident
 │   ├── app-nginx.yaml
 │   ├── app-netshoot.yaml
 │   └── svc-nginx.yaml
-├── scenario-4-cilium-network-policies/
+├── scenario-4-cilium-network-policies-layer3-layer4/
 │   ├── instructions-scenario-4.md
 │   ├── create-kind-cluster.sh
-│   └── light-lab.yaml
+│   ├── light-lab.yaml
+│   ├── namespaces.yaml
+│   ├── app-api.yaml
+│   ├── app-redis.yaml
+│   ├── app-clients.yaml
+│   ├── cnp-01-default-deny.yaml
+│   ├── cnp-02-allow-web-to-api.yaml
+│   ├── cnp-03-allow-api-to-redis.yaml
+│   ├── cnp-04-web-egress-no-dns.yaml
+│   └── cnp-04-web-egress.yaml
 ├── scenario-5-cilium-network-policies-layer7/
 │   ├── instructions-scenario-5.md
 │   ├── create-kind-cluster.sh

@@ -1,0 +1,28 @@
+# Client pods used to generate traffic.
+#   web      — the shop frontend, allowed to call the API
+#   intruder — an unrelated workload in "default", allowed nowhere
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web
+  namespace: frontend
+  labels:
+    app.kubernetes.io/name: web
+spec:
+  containers:
+    - name: netshoot
+      image: nicolaka/netshoot
+      command: ["sleep", "infinity"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: intruder
+  namespace: default
+  labels:
+    app.kubernetes.io/name: intruder
+spec:
+  containers:
+    - name: netshoot
+      image: nicolaka/netshoot
+      command: ["sleep", "infinity"]

@@ -1,0 +1,19 @@
+# Allow only the backend API to reach Redis, and only on TCP 6379.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-api-to-redis
+  namespace: database
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: backend
+            app.kubernetes.io/name: api
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP

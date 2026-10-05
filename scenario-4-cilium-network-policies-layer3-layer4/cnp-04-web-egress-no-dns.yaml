@@ -1,0 +1,21 @@
+# Restrict what web may call: the API on TCP 8080 and nothing else.
+# Deliberately incomplete — DNS is not allowed, so name lookups fail.
+# cnp-04-web-egress.yaml replaces this policy with the fixed version.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: web-egress
+  namespace: frontend
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: backend
+            app.kubernetes.io/name: api
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP

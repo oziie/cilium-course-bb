@@ -1,0 +1,22 @@
+# Default deny ingress for every pod in the backend and database namespaces.
+# endpointSelector: {} selects all pods in the policy's namespace; the single
+# empty ingress rule allows nothing, which switches those pods to deny-by-default.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: backend
+spec:
+  endpointSelector: {}
+  ingress:
+    - {}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: database
+spec:
+  endpointSelector: {}
+  ingress:
+    - {}

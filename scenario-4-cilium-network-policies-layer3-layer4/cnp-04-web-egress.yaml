@@ -1,0 +1,31 @@
+# Restrict what web may call: the API on TCP 8080, plus DNS to kube-dns so
+# Service names still resolve. Same name as the no-dns version, so applying
+# this file replaces it.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: web-egress
+  namespace: frontend
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: backend
+            app.kubernetes.io/name: api
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
