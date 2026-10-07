@@ -1,0 +1,41 @@
+# L3/L4 baseline carried over from scenario 4:
+#   - default deny ingress in backend and database
+#   - api -> redis on TCP 6379
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: backend
+spec:
+  endpointSelector: {}
+  ingress:
+    - {}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: database
+spec:
+  endpointSelector: {}
+  ingress:
+    - {}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-api-to-redis
+  namespace: database
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: backend
+            app.kubernetes.io/name: api
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP

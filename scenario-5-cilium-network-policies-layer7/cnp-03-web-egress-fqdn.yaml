@@ -1,0 +1,39 @@
+# web egress: DNS (through Cilium's DNS proxy), the api on 8080, and one external
+# host by name. The dns rule is what lets Cilium learn the IPs behind api.github.com.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: web-egress-fqdn
+  namespace: frontend
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: backend
+            app.kubernetes.io/name: api
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+    - toFQDNs:
+        - matchName: api.github.com
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
