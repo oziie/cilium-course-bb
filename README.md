@@ -49,19 +49,19 @@ below uses.
 
 **Lab cluster**
 
-All scenarios has own kind cluster type but it's usualy with this architecture: 1 control-plane + 2 workers, default CNI
-disabled so Cilium owns the data plane. Each scenario folder contains a
-`create-kind-cluster.sh` that creates the kind cluster (or reuses an existing one), sets the `kind-kind`
-kubectl context in `$KUBECONFIG` and verifies the node layout:
+All scenarios use the same cluster: 1 control-plane + 2 workers, default CNI disabled so
+Cilium owns the data plane. Each scenario folder contains a `create-kind-cluster.sh` that
+creates the kind cluster (or reuses an existing one), sets the `kind-kind` kubectl context
+in `$KUBECONFIG`, installs Cilium with Helm and waits until all nodes are `Ready`:
 
 ```bash
-cd scenario-1-installation-cilium
-./create-kind-cluster.sh            # --recreate | --delete | --image kindest/node:<tag>
+cd scenario-2-pod-connectivity      # any scenario folder
+./create-kind-cluster.sh            # --recreate | --delete | --no-cilium | --image kindest/node:<tag>
 ```
 
-Working through the scenarios in order, you only need to run it once in Scenario 1. Run it
-from a later scenario's folder to rebuild the cluster, then reinstall Cilium as in
-Scenario 1.
+Scenario 1 teaches the Cilium installation itself, so there you run it with `--no-cilium`
+and install Cilium by hand. From any later scenario's folder, the script rebuilds a
+ready-to-use cluster in one step.
 
 ---
 

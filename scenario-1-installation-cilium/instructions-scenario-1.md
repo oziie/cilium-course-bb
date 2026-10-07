@@ -33,7 +33,7 @@ folder:
 
 ```bash
 cd scenario-1-installation-cilium
-./create-kind-cluster.sh
+./create-kind-cluster.sh --no-cilium
 kubectl config current-context   # should print kind-kind, matching cluster.name below
 ```
 
@@ -43,6 +43,10 @@ The script:
 - creates the cluster from `light-lab.yaml` (or reuses it if it already exists)
 - writes the `kind-kind` context to `$KUBECONFIG` (default `~/.kube/config`) and switches to it
 - waits for the API server and verifies the 1 control-plane + 2 worker layout
+
+`--no-cilium` stops there, because installing Cilium is what this scenario is about.
+Without the flag, the script also runs the Helm install below for you. That is how the
+later scenarios use it.
 
 Useful flags: `--recreate` to start fresh, `--image kindest/node:<tag>` to pin the
 Kubernetes version, `--delete` to remove the cluster. See `./create-kind-cluster.sh --help`.
@@ -135,4 +139,6 @@ Delete it only when you are done with the lab or want to start over:
 ```
 
 > **Note:** Deleting the cluster removes the Cilium installation with it. To come back,
-> re-run this scenario from [Create kind cluster](#create-kind-cluster-no-need-for-bb).
+> re-run this scenario from [Create kind cluster](#create-kind-cluster-no-need-for-bb),
+> or run `./create-kind-cluster.sh` (without `--no-cilium`) from any later scenario's
+> folder to get a cluster with Cilium already installed.

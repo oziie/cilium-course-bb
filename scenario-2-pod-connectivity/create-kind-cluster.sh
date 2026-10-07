@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
 #
-# create-kind-cluster.sh — Create the kind cluster used by scenarios 1 to 6.
+# create-kind-cluster.sh — Create the kind cluster used by scenarios 1 to 6
+# and install Cilium on it.
 #
-# Layout: 1 control-plane + 2 workers, default CNI (kindnetd) disabled so
-# Cilium can be installed in Scenario 1. Every scenario folder ships the same
-# script and light-lab.yaml; re-running it reuses an existing cluster.
+# Layout: 1 control-plane + 2 workers, default CNI (kindnetd) disabled and
+# replaced by Cilium (Helm, same settings as Scenario 1). Every scenario folder
+# ships the same script and light-lab.yaml; re-running it reuses an existing
+# cluster and leaves an existing Cilium installation untouched.
 # Run setup-ubuntu/setup-ubuntu.sh first.
 #
 # Usage:
-#   ./create-kind-cluster.sh [--name NAME] [--config FILE] [--image IMAGE] [--recreate]
+#   ./create-kind-cluster.sh [--name NAME] [--config FILE] [--image IMAGE]
+#                            [--cilium-version VER] [--no-cilium] [--recreate]
 #   ./create-kind-cluster.sh --delete [--name NAME]
 #
 # Options:
-#   --name NAME     cluster name (default: kind -> context kind-kind, nodes kind-*)
-#   --config FILE   kind config (default: light-lab.yaml next to this script)
-#   --image IMAGE   kindest/node image to pin the Kubernetes version (default: kind's)
-#   --recreate      delete the cluster first if it already exists
-#   --delete        delete the cluster and its kubeconfig entry, then exit
+#   --name NAME           cluster name (default: kind -> context kind-kind, nodes kind-*)
+#   --config FILE         kind config (default: light-lab.yaml next to this script)
+#   --image IMAGE         kindest/node image to pin the Kubernetes version (default: kind's)
+#   --cilium-version VER  Cilium Helm chart version (default: 1.18.4)
+#   --no-cilium           create the cluster only; install Cilium yourself (Scenario 1)
+#   --recreate            delete the cluster first if it already exists
+#   --delete              delete the cluster and its kubeconfig entry, then exit
 #
 # Environment:
 #   KUBECONFIG      kubeconfig file to write (default: ~/.kube/config)
@@ -43,6 +48,8 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 CLUSTER_NAME="kind"
 KIND_CONFIG="${SCRIPT_DIR}/light-lab.yaml"
 NODE_IMAGE=""
+CILIUM_VERSION="1.18.4"
+INSTALL_CILIUM=true
 RECREATE=false
 DELETE=false
 
@@ -53,9 +60,11 @@ while [[ $# -gt 0 ]]; do
     --name)     need_value "$@"; CLUSTER_NAME="$2"; shift 2 ;;
     --config)   need_value "$@"; KIND_CONFIG="$2"; shift 2 ;;
     --image)    need_value "$@"; NODE_IMAGE="$2"; shift 2 ;;
+    --cilium-version) need_value "$@"; CILIUM_VERSION="$2"; shift 2 ;;
+    --no-cilium) INSTALL_CILIUM=false; shift ;;
     --recreate) RECREATE=true; shift ;;
     --delete)   DELETE=true; shift ;;
-    -h|--help)  sed -n '2,23p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help)  sed -n '2,27p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) die "unknown argument: $1 (see --help)" ;;
   esac
 done
@@ -72,7 +81,9 @@ export KUBECONFIG="$KUBECONFIG_FILE"
 # ----------------------------------------------------------------------------
 # Preflight
 # ----------------------------------------------------------------------------
-for tool in docker kind kubectl; do
+tools=(docker kind kubectl)
+if $INSTALL_CILIUM && ! $DELETE; then tools+=(helm); fi
+for tool in "${tools[@]}"; do
   have "$tool" || die "'${tool}' not found — run setup-ubuntu/setup-ubuntu.sh first."
 done
 
@@ -167,12 +178,52 @@ worker_count=$(( total_count - cp_count ))
 (( cp_count == 1 && worker_count == 2 )) \
   || die "expected 1 control-plane + 2 workers, found ${cp_count} + ${worker_count} (check ${KIND_CONFIG})."
 
+# ----------------------------------------------------------------------------
+# Cilium
+# ----------------------------------------------------------------------------
+if $INSTALL_CILIUM; then
+  # Never upgrade an existing release: helm would reset values that later
+  # scenarios add on top (e.g. Hubble in Scenario 6).
+  if helm status cilium -n kube-system >/dev/null 2>&1; then
+    info "Cilium is already installed — leaving it as is"
+  else
+    info "Installing Cilium ${CILIUM_VERSION} (this takes a few minutes)"
+    helm upgrade --install cilium cilium --repo https://helm.cilium.io/ \
+      -n kube-system \
+      --version "$CILIUM_VERSION" \
+      --set cluster.name="$CONTEXT" \
+      --set ipam.mode=kubernetes \
+      --set operator.replicas=1 \
+      --set routingMode=tunnel \
+      --set tunnelProtocol=vxlan \
+      || die "helm failed to install Cilium ${CILIUM_VERSION}."
+  fi
+
+  info "Waiting for Cilium and the nodes to become ready"
+  kubectl -n kube-system rollout status daemonset/cilium --timeout=300s
+  kubectl -n kube-system rollout status daemonset/cilium-envoy --timeout=300s
+  kubectl -n kube-system rollout status deployment/cilium-operator --timeout=300s
+  kubectl wait --for=condition=Ready nodes --all --timeout=300s >/dev/null \
+    || die "nodes did not become Ready — check 'kubectl -n kube-system get pods'."
+fi
+
 kubectl get nodes -o wide
 
-cat <<NEXT
+if $INSTALL_CILIUM; then
+  cat <<NEXT
 
 ------------------------------------------------------------------
-Cluster '${CLUSTER_NAME}' is up: 1 control-plane + 2 workers.
+Cluster '${CLUSTER_NAME}' is up: 1 control-plane + 2 workers, Cilium installed.
+kubectl context : ${CONTEXT}
+kubeconfig      : ${KUBECONFIG_FILE}
+
+Check it with: cilium status
+NEXT
+else
+  cat <<NEXT
+
+------------------------------------------------------------------
+Cluster '${CLUSTER_NAME}' is up: 1 control-plane + 2 workers, no CNI.
 kubectl context : ${CONTEXT}
 kubeconfig      : ${KUBECONFIG_FILE}
 
@@ -180,6 +231,7 @@ Nodes are NotReady and coredns is Pending until a CNI is installed —
 that is expected. Install Cilium next, as described in Scenario 1:
   scenario-1-installation-cilium/instructions-scenario-1.md
 NEXT
+fi
 
 if [[ "$KUBECONFIG_FILE" != "$HOME/.kube/config" ]]; then
   cat <<HINT

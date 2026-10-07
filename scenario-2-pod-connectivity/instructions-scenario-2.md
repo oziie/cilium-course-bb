@@ -13,11 +13,13 @@ cd scenario-2-pod-connectivity
 kubectl config current-context   # should print kind-kind
 ```
 
-The script fails fast on errors, sets the `kind-kind` context in `$KUBECONFIG` (default
-`~/.kube/config`) and verifies the node layout. A freshly created cluster has **no CNI**:
-install Cilium by following
-[Scenario 1 — Cilium Installation](../scenario-1-installation-cilium/instructions-scenario-1.md#cilium-installation-via-helm)
-before continuing. Check it with `cilium status --wait`.
+The script creates the cluster, installs Cilium with the same settings as
+[Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md) and waits until
+all nodes are `Ready`. If Cilium is already installed, it is left as is. Check it with:
+
+```bash
+cilium status
+```
 
 ## Deploy nginx application on `kind-worker2` node
 
@@ -121,6 +123,4 @@ If you are done with the lab, delete the cluster too (no need for BB):
 ```
 
 > **Note:** Deleting the cluster removes the Cilium installation with it. The next
-> scenario can recreate it with its own `create-kind-cluster.sh`, after which Cilium
-> must be reinstalled as in
-> [Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md).
+> scenario recreates it, Cilium included, with its own `create-kind-cluster.sh`.

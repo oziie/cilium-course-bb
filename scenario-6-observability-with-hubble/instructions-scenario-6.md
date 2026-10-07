@@ -13,8 +13,10 @@ cd scenario-6-observability-with-hubble
 kubectl config current-context   # should print kind-kind
 ```
 
-The script fails fast on errors, sets the `kind-kind` context in `$KUBECONFIG` (default
-`~/.kube/config`) and verifies the node layout. A freshly created cluster has **no CNI**:
-install Cilium by following
-[Scenario 1 — Cilium Installation](../scenario-1-installation-cilium/instructions-scenario-1.md#cilium-installation-via-helm)
-before continuing. Check it with `cilium status --wait`.
+The script creates the cluster, installs Cilium with the same settings as
+[Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md) and waits until
+all nodes are `Ready`. If Cilium is already installed, it is left as is. Check it with:
+
+```bash
+cilium status
+```

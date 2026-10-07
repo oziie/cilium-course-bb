@@ -17,11 +17,13 @@ cd scenario-5-cilium-network-policies-layer7
 kubectl config current-context   # should print kind-kind
 ```
 
-The script fails fast on errors, sets the `kind-kind` context in `$KUBECONFIG` (default
-`~/.kube/config`) and verifies the node layout. A freshly created cluster has **no CNI**:
-install Cilium by following
-[Scenario 1 — Cilium Installation](../scenario-1-installation-cilium/instructions-scenario-1.md#cilium-installation-via-helm)
-before continuing. Check it with `cilium status --wait`.
+The script creates the cluster, installs Cilium with the same settings as
+[Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md) and waits until
+all nodes are `Ready`. If Cilium is already installed, it is left as is. Check it with:
+
+```bash
+cilium status
+```
 
 L7 policies are enforced by Envoy. The Scenario 1 install already runs it as the
 `cilium-envoy` DaemonSet, so there is nothing extra to enable:
