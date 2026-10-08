@@ -7,6 +7,8 @@
 # replaced by Cilium (Helm, same settings as Scenario 1). Every scenario folder
 # ships the same script and light-lab.yaml; re-running it reuses an existing
 # cluster and leaves an existing Cilium installation untouched.
+# Scenario 6 only: Hubble Relay and Hubble UI are also enabled, on a new or an
+# existing Cilium installation (an existing one keeps its other values).
 # Run setup-ubuntu/setup-ubuntu.sh first.
 #
 # Usage:
@@ -20,6 +22,7 @@
 #   --image IMAGE         kindest/node image to pin the Kubernetes version (default: kind's)
 #   --cilium-version VER  Cilium Helm chart version (default: 1.18.4)
 #   --no-cilium           create the cluster only; install Cilium yourself (Scenario 1)
+#                         (Hubble is skipped too)
 #   --recreate            delete the cluster first if it already exists
 #   --delete              delete the cluster and its kubeconfig entry, then exit
 #
@@ -64,7 +67,7 @@ while [[ $# -gt 0 ]]; do
     --no-cilium) INSTALL_CILIUM=false; shift ;;
     --recreate) RECREATE=true; shift ;;
     --delete)   DELETE=true; shift ;;
-    -h|--help)  sed -n '2,27p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help)  sed -n '2,30p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) die "unknown argument: $1 (see --help)" ;;
   esac
 done
@@ -199,10 +202,33 @@ if $INSTALL_CILIUM; then
       || die "helm failed to install Cilium ${CILIUM_VERSION}."
   fi
 
+  # Scenario 6: enable Hubble Relay and UI. --reuse-values keeps the values
+  # already set on the release, and pinning the installed chart version keeps
+  # an existing Cilium from being upgraded.
+  if kubectl -n kube-system get deployment hubble-relay hubble-ui >/dev/null 2>&1; then
+    info "Hubble Relay and UI are already enabled"
+  else
+    installed_chart=$(helm list -n kube-system --filter '^cilium$' -o yaml \
+      | awk '/^ *chart:/ {print $2}')
+    installed_version="${installed_chart#cilium-}"
+    [[ -n "$installed_version" ]] \
+      || die "could not read the installed Cilium chart version from helm."
+    info "Enabling Hubble Relay and UI on Cilium ${installed_version}"
+    helm upgrade cilium cilium --repo https://helm.cilium.io/ \
+      -n kube-system \
+      --version "$installed_version" \
+      --reuse-values \
+      --set hubble.relay.enabled=true \
+      --set hubble.ui.enabled=true \
+      || die "helm failed to enable Hubble Relay and UI."
+  fi
+
   info "Waiting for Cilium and the nodes to become ready"
   kubectl -n kube-system rollout status daemonset/cilium --timeout=300s
   kubectl -n kube-system rollout status daemonset/cilium-envoy --timeout=300s
   kubectl -n kube-system rollout status deployment/cilium-operator --timeout=300s
+  kubectl -n kube-system rollout status deployment/hubble-relay --timeout=300s
+  kubectl -n kube-system rollout status deployment/hubble-ui --timeout=300s
   kubectl wait --for=condition=Ready nodes --all --timeout=300s >/dev/null \
     || die "nodes did not become Ready — check 'kubectl -n kube-system get pods'."
 fi
@@ -213,11 +239,13 @@ if $INSTALL_CILIUM; then
   cat <<NEXT
 
 ------------------------------------------------------------------
-Cluster '${CLUSTER_NAME}' is up: 1 control-plane + 2 workers, Cilium installed.
+Cluster '${CLUSTER_NAME}' is up: 1 control-plane + 2 workers, Cilium installed,
+Hubble Relay and UI enabled.
 kubectl context : ${CONTEXT}
 kubeconfig      : ${KUBECONFIG_FILE}
 
 Check it with: cilium status
+Connect the CLI: cilium hubble port-forward   (then: hubble status)
 NEXT
 else
   cat <<NEXT

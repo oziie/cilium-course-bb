@@ -107,7 +107,7 @@ Extend network policies to Layer 7 (HTTP). Restrict access based on HTTP methods
 **Scenario 6 — Observability with Hubble**
 [scenario-6-observability-with-hubble/](scenario-6-observability-with-hubble/)
 
-Enable Hubble and use the Hubble CLI and UI to inspect live network flows, identify dropped packets, and understand traffic patterns across the cluster.
+Enable Hubble Relay and UI, then use the Hubble CLI and UI to observe live flows with no policy in place: pod-to-pod, pod-to-Service, DNS, traffic leaving the cluster, and a failed connection.
 
 ---
 
@@ -155,7 +155,10 @@ Enable Hubble and use the Hubble CLI and UI to inspect live network flows, ident
 └── scenario-6-observability-with-hubble/
     ├── instructions-scenario-6.md
     ├── create-kind-cluster.sh
-    └── light-lab.yaml
+    ├── light-lab.yaml
+    ├── app-nginx.yaml
+    ├── app-netshoot.yaml
+    └── svc-nginx.yaml
 ```
 
 ## References
