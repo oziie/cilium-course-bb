@@ -30,11 +30,12 @@ Its advantage over Kubernetes Host Scope is that the cluster can have **several*
 instead of just one. That is more flexible, but it does not solve IP address exhaustion
 if the pools were too small to begin with. This scenario simulates exactly that.
 
-## Delete the Previous Cluster (no need for BB)
+## Delete the Previous Cluster (mandatory, BB included)
 
 The IPAM mode is set when Cilium is installed and cannot be changed on a running
-cluster. The cluster from the previous scenarios uses `ipam.mode=kubernetes`, so delete
-it first:
+cluster. The cluster from the previous scenarios uses `ipam.mode=kubernetes`, and this
+scenario needs `ipam.mode=cluster-pool`. **Deleting the cluster is mandatory in every
+environment, BB included:**
 
 ```bash
 cd scenario-7-cluster-scope-ipam
@@ -77,7 +78,9 @@ and `cilium-health` interfaces, so **only 4 are left for pods** on each node.
 > [`light-lab.yaml`](light-lab.yaml) is the same as in the other scenarios; a comment in
 > it points to `cilium-values.yaml`.
 
-## Create the Cluster and Install Cilium (no need for BB)
+## Create the Cluster and Install Cilium (mandatory, BB included)
+
+After the deletion there is no cluster left, so this step is mandatory too:
 
 ```bash
 ./create-kind-cluster.sh
@@ -210,8 +213,8 @@ Remove the test applications:
 kubectl delete -f nginx-deployment-10-replicas.yaml -f netshoot-client-pod.yaml
 ```
 
-This cluster uses different IPAM settings from the other scenarios. Delete it when you
-are done (no need for BB):
+This cluster uses `ipam.mode=cluster-pool`, while the other scenarios use different
+settings. **Deleting it is mandatory in every environment, BB included:**
 
 ```bash
 ./create-kind-cluster.sh --delete   # or: kind delete cluster --name kind
