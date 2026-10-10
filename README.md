@@ -34,8 +34,9 @@ script and the kind config file it uses.
 cd setup-ubuntu && ./setup-ubuntu.sh
 ```
 
-Learners on the Bulut Bilisimciler hosted environment can skip this — the cluster and
-CLIs are pre-provisioned.
+Learners on the Bulut Bilisimciler hosted environment can skip this — the CLIs are
+pre-installed, and each scenario's first step creates the cluster (see
+[Bulut Bilisimciler Platform](#bulut-bilisimciler-platform-bb-template)).
 
 ## Course Content
 
@@ -138,16 +139,19 @@ Expose the Bookinfo app with the Cilium Ingress controller on a kube-proxy-free 
 │   └── setup-ubuntu.sh
 ├── scenario-1-installation-cilium/
 │   ├── instructions-scenario-1.md
+│   ├── bb-template/
 │   ├── create-kind-cluster.sh
 │   └── light-lab.yaml
 ├── scenario-2-pod-connectivity/
 │   ├── instructions-scenario-2.md
+│   ├── bb-template/
 │   ├── create-kind-cluster.sh
 │   ├── light-lab.yaml
 │   ├── app-nginx.yaml
 │   └── app-netshoot.yaml
 ├── scenario-3-service-connectivity/
 │   ├── instructions-scenario-3.md
+│   ├── bb-template/
 │   ├── create-kind-cluster.sh
 │   ├── light-lab.yaml
 │   ├── app-nginx.yaml
@@ -155,6 +159,7 @@ Expose the Bookinfo app with the Cilium Ingress controller on a kube-proxy-free 
 │   └── svc-nginx.yaml
 ├── scenario-4-cilium-network-policies-layer3-layer4/
 │   ├── instructions-scenario-4.md
+│   ├── bb-template/
 │   ├── create-kind-cluster.sh
 │   ├── light-lab.yaml
 │   ├── namespaces.yaml
@@ -168,10 +173,12 @@ Expose the Bookinfo app with the Cilium Ingress controller on a kube-proxy-free 
 │   └── cnp-04-web-egress.yaml
 ├── scenario-5-cilium-network-policies-layer7/
 │   ├── instructions-scenario-5.md
+│   ├── bb-template/
 │   ├── create-kind-cluster.sh
 │   └── light-lab.yaml
 ├── scenario-6-observability-with-hubble/
 │   ├── instructions-scenario-6.md
+│   ├── bb-template/
 │   ├── create-kind-cluster.sh
 │   ├── light-lab.yaml
 │   ├── app-nginx.yaml
@@ -179,6 +186,7 @@ Expose the Bookinfo app with the Cilium Ingress controller on a kube-proxy-free 
 │   └── svc-nginx.yaml
 ├── scenario-7-cluster-scope-ipam/
 │   ├── instructions-scenario-7.md
+│   ├── bb-template/
 │   ├── create-kind-cluster.sh
 │   ├── light-lab.yaml
 │   ├── cilium-values.yaml
@@ -186,6 +194,7 @@ Expose the Bookinfo app with the Cilium Ingress controller on a kube-proxy-free 
 │   └── nginx-deployment-10-replicas.yaml
 └── scenario-8-ingress/
     ├── instructions-scenario-8.md
+    ├── bb-template/
     ├── create-kind-cluster.sh
     ├── light-lab.yaml
     ├── cilium-values.yaml
@@ -193,6 +202,38 @@ Expose the Bookinfo app with the Cilium Ingress controller on a kube-proxy-free 
     ├── lb-ippool.yaml
     └── l2-announcement-policy.yaml
 ```
+
+## Bulut Bilisimciler Platform (`bb-template/`)
+
+Every scenario folder has a `bb-template/` folder. It defines the scenario's steps and
+structure for the [Bulut Bilisimciler](https://bulutbilisimciler.com) platform, where
+learners run the lab in the browser. The platform shows the instructions step by step
+next to a terminal.
+
+| File | Purpose |
+| --- | --- |
+| `index.json` | the order of the steps, the intro and finish pages, the environment (terminal-only, Ubuntu image) and which step runs the verification |
+| `en_intro.md` / `tr_intro.md` | start page, the same in every scenario except the scenario title |
+| `en_stepN.md` / `tr_stepN.md` | the steps (at most 4), in English and Turkish |
+| `en_finish.md` / `tr_finish.md` | end page, the same in every scenario except the scenario title |
+| `verify.json` | the check that runs on the last step (currently a placeholder) |
+
+`index.json` names the files without a language prefix (`step1.md`). The platform picks
+the `en_` or `tr_` file for the learner's language.
+
+The steps cover the same content as `instructions-scenario-N.md`, adapted to the
+platform:
+
+- The learner starts on a fresh Ubuntu machine with the CLIs installed but **no cluster
+  and no repository files**. Step 1 of every scenario creates the kind cluster and
+  installs Cilium with plain commands (no `create-kind-cluster.sh`).
+- Manifests are written inline in the commands (`kubectl apply -f - <<EOF`), so each step
+  is self-contained.
+- Some parts are shortened or left out to fit 4 steps and the terminal-only layout (for
+  example, the Hubble UI in scenario 6).
+
+When you change a scenario's `instructions-scenario-N.md`, update its `bb-template/`
+steps in both languages too.
 
 ## References
 
