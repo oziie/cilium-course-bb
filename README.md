@@ -111,6 +111,15 @@ Enable Hubble Relay and UI, then use the Hubble CLI and UI to observe live flows
 
 ---
 
+### Module 5 — IP Address Management
+
+**Scenario 7 — Cluster Scope IPAM**
+[scenario-7-cluster-scope-ipam/](scenario-7-cluster-scope-ipam/)
+
+Reinstall Cilium in Cluster Scope IPAM mode (`cluster-pool`) with two small `/28` pools, check the `/29` subnet each node receives, and exhaust a node's addresses to see the limits of a static address space.
+
+---
+
 ## Repository Structure
 
 ```
@@ -152,13 +161,20 @@ Enable Hubble Relay and UI, then use the Hubble CLI and UI to observe live flows
 │   ├── instructions-scenario-5.md
 │   ├── create-kind-cluster.sh
 │   └── light-lab.yaml
-└── scenario-6-observability-with-hubble/
-    ├── instructions-scenario-6.md
+├── scenario-6-observability-with-hubble/
+│   ├── instructions-scenario-6.md
+│   ├── create-kind-cluster.sh
+│   ├── light-lab.yaml
+│   ├── app-nginx.yaml
+│   ├── app-netshoot.yaml
+│   └── svc-nginx.yaml
+└── scenario-7-cluster-scope-ipam/
+    ├── instructions-scenario-7.md
     ├── create-kind-cluster.sh
     ├── light-lab.yaml
-    ├── app-nginx.yaml
-    ├── app-netshoot.yaml
-    └── svc-nginx.yaml
+    ├── cilium-values.yaml
+    ├── netshoot-client-pod.yaml
+    └── nginx-deployment-10-replicas.yaml
 ```
 
 ## References

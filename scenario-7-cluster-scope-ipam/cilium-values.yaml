@@ -1,0 +1,14 @@
+# Cilium Helm values for Scenario 7 (Cluster Scope IPAM).
+# Same settings as Scenario 1, except IPAM: Cilium allocates the node PodCIDRs
+# from two small pools instead of using the ones Kubernetes assigns.
+operator:
+  replicas: 1
+routingMode: tunnel
+tunnelProtocol: vxlan
+ipam:
+  mode: cluster-pool
+  operator:
+    clusterPoolIPv4MaskSize: 29
+    clusterPoolIPv4PodCIDRList:
+      - 10.0.42.0/28
+      - 10.0.84.0/28
