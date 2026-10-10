@@ -120,6 +120,31 @@ kind-kind/kind-worker2         Connected   59s     1.08      87/4095 (  2.12%)
 `Connected Nodes: 3/3` means Relay reaches the Hubble server on every node. Each node keeps
 its last 4095 flows in memory, so Hubble shows recent traffic, not a full history.
 
+> **Note:** If `hubble status` fails with
+> `dial tcp [::1]:4245: connect: connection refused`, the port-forward is not running.
+> Start `cilium hubble port-forward` again and leave its terminal open.
+
+### Hubble CLI: Through Relay or Inside a Cilium Pod
+
+The `cilium` agent image also ships a `hubble` binary, so you can run the CLI inside an
+agent pod without Relay or a port-forward:
+
+```bash
+$ kubectl -n kube-system exec ds/cilium -- hubble observe --last 5
+```
+
+| | Through Relay (port-forward) | Inside a `cilium` pod |
+| --- | --- | --- |
+| Talks to | Hubble Relay on `localhost:4245` | the local Hubble server of that one agent |
+| Flows you see | from **all** nodes | from **that node only** |
+| Needs | Relay enabled + `cilium hubble port-forward` | nothing extra |
+| `hubble list nodes` | works (3 nodes) | not available |
+
+This scenario uses **Relay**: the client and nginx run on different nodes, and Relay shows
+both sides of a connection in one stream. `ds/cilium` picks one agent pod for you, which
+may not be on the node you care about. Keep the in-pod method as a fallback for when Relay
+is down.
+
 ## Deploy the Applications
 
 The same apps as in scenario 3: nginx on `kind-worker2`, the client on `kind-worker` and a

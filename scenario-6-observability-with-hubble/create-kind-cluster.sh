@@ -245,7 +245,10 @@ kubectl context : ${CONTEXT}
 kubeconfig      : ${KUBECONFIG_FILE}
 
 Check it with: cilium status
-Connect the CLI: cilium hubble port-forward   (then: hubble status)
+
+Connect the Hubble CLI — the port-forward is NOT started by this script:
+  1. In a second terminal, run and leave open: cilium hubble port-forward
+  2. Back here:                                 hubble status
 NEXT
 else
   cat <<NEXT
