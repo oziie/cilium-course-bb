@@ -1,0 +1,15 @@
+# Cilium Helm values for Scenario 8 (Ingress).
+# Scenario 1 settings plus kube-proxy replacement, L2 announcements and the
+# Cilium Ingress controller. create-kind-cluster.sh also sets cluster.name,
+# k8sServiceHost and k8sServicePort, which kube-proxy replacement needs.
+operator:
+  replicas: 1
+routingMode: tunnel
+tunnelProtocol: vxlan
+kubeProxyReplacement: true
+l2announcements:
+  enabled: true
+ipam:
+  mode: kubernetes
+ingressController:
+  enabled: true

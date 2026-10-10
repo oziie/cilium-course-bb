@@ -120,6 +120,15 @@ Reinstall Cilium in Cluster Scope IPAM mode (`cluster-pool`) with two small `/28
 
 ---
 
+### Module 6 — Exposing Applications
+
+**Scenario 8 — Ingress**
+[scenario-8-ingress/](scenario-8-ingress/)
+
+Expose the Bookinfo app with the Cilium Ingress controller on a kube-proxy-free cluster: assign the Ingress an external IP with LB-IPAM, announce it with a Layer 2 announcement policy, and reach it with `curl` from outside the cluster.
+
+---
+
 ## Repository Structure
 
 ```
@@ -168,13 +177,21 @@ Reinstall Cilium in Cluster Scope IPAM mode (`cluster-pool`) with two small `/28
 │   ├── app-nginx.yaml
 │   ├── app-netshoot.yaml
 │   └── svc-nginx.yaml
-└── scenario-7-cluster-scope-ipam/
-    ├── instructions-scenario-7.md
+├── scenario-7-cluster-scope-ipam/
+│   ├── instructions-scenario-7.md
+│   ├── create-kind-cluster.sh
+│   ├── light-lab.yaml
+│   ├── cilium-values.yaml
+│   ├── netshoot-client-pod.yaml
+│   └── nginx-deployment-10-replicas.yaml
+└── scenario-8-ingress/
+    ├── instructions-scenario-8.md
     ├── create-kind-cluster.sh
     ├── light-lab.yaml
     ├── cilium-values.yaml
-    ├── netshoot-client-pod.yaml
-    └── nginx-deployment-10-replicas.yaml
+    ├── ingress-basic.yaml
+    ├── lb-ippool.yaml
+    └── l2-announcement-policy.yaml
 ```
 
 ## References
