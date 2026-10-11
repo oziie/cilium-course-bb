@@ -1,4 +1,4 @@
-### Ağ Politikaları (Katman 7)
+### Ağ Politikaları (Layer 7)
 
 #### Adım 2 — API'yi Dağıtın ve Tüm Gelen Trafiği Engelleyin
 

@@ -1,4 +1,4 @@
-### Ağ Politikaları (Katman 7)
+### Ağ Politikaları (Layer 7)
 
 #### Adım 3 — Yalnızca Belirli HTTP Çağrılarına İzin Verin
 

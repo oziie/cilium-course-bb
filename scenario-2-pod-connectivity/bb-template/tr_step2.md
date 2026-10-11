@@ -53,7 +53,7 @@ kubectl wait --for=condition=Ready pod --all --timeout=120s
 kubectl get pods -o wide
 ```
 
-`IP` ve `NODE` sütunlarına bakın: nginx `kind-worker2` üzerinde, istemci ise
+`IP` ve `NODE` sütunlarına bakın: nginx `kind-worker2` üzerinde, netshoot-client ise
 `kind-worker` üzerinde çalışır; her birinin kendi pod IP'si vardır (örneğin
 `10.244.2.127` ve `10.244.1.67`). IP'ler farklı aralıklardan gelir, çünkü her düğümün
 kendi pod adres aralığı vardır.

@@ -73,7 +73,7 @@ kubectl wait --for=condition=Ready pod --all -A --timeout=180s
 
 **Başlangıç durumu.** Hiçbir politika yokken Cilium tüm trafiğe izin verir. Her test
 `ALLOWED` (izin verildi) ya da `BLOCKED` (engellendi) yazdırır. Engellenen bir bağlantı
-sessizce düşürülür, bu yüzden komutlar 3 saniye sonra vazgeçer:
+sessizce düşürülür, bu yüzden komutlar 3 saniye sonra denemeyi bırakır:
 
 ```bash
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080 && echo ALLOWED || echo BLOCKED

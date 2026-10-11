@@ -2,7 +2,7 @@
 
 #### Adım 4 — Ön Yüzün Neleri Çağırabileceğini Kısıtlayın (Egress)
 
-Şimdiye kadarki tüm politikalar **ingress** idi: hedefi korurlar. Bir **egress**
+Şimdiye kadarki tüm politikalar **ingress** idi: hedefi(destination) korurlar. Bir **egress**
 politikası ise bir kaynağın neleri çağırabileceğini sınırlar. `web` podunu yalnızca
 8080 portundaki API ile sınırlayın:
 

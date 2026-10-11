@@ -53,6 +53,6 @@ kubectl wait --for=condition=Ready pod --all --timeout=120s
 kubectl get pods -o wide
 ```
 
-Look at the `IP` and `NODE` columns: nginx runs on `kind-worker2` and the client on
+Look at the `IP` and `NODE` columns: nginx runs on `kind-worker2` and the netshoot-client on
 `kind-worker`, each with its own pod IP (for example `10.244.2.127` and `10.244.1.67`).
 The IPs come from different ranges because each node has its own pod address range.

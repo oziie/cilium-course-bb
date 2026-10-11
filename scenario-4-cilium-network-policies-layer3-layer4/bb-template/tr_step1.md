@@ -4,8 +4,24 @@
 
 Bu senaryoda üç katmanlı küçük bir mağaza uygulamasını `CiliumNetworkPolicy` ile
 kısıtlayacaksınız. Her katman kendi namespace'inde çalışır ve yalnızca her katmanın
-gerçekten ihtiyaç duyduğu trafiğe izin verilir. Önce lab kümesini kurun: 1 control-plane
-ve 2 worker düğümü, ağ eklentisi (CNI) olarak Cilium.
+gerçekten ihtiyaç duyduğu trafiğe izin verilir.
+
+```
+ ns: frontend           ns: backend                   ns: database
+┌─────────────┐  8080  ┌───────────────────┐  6379   ┌─────────────┐
+│ web         │──────▶ │ api (nginx)       │──────▶  │ redis       │
+│ (netshoot)  │        │  :8080 public API │         │  :6379      │
+└─────────────┘        │  :9090 admin      │         └─────────────┘
+                       └───────────────────┘
+ ns: default
+┌─────────────┐
+│ intruder    │   her yerde engellenmeli
+│ (netshoot)  │
+└─────────────┘
+```
+
+Önce lab kümesini kurun: 1 control-plane ve 2 worker düğümü, ağ eklentisi (CNI)
+olarak Cilium.
 
 kind yapılandırma dosyasını yazın ve kümeyi oluşturun. `disableDefaultCNI: true`,
 kind'ın varsayılan ağ eklentisini kapatır; böylece pod ağını Cilium yönetebilir:

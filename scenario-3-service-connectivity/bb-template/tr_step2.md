@@ -79,5 +79,5 @@ Service'in nginx podunu bulduğunu kontrol edin:
 kubectl get endpointslices -l kubernetes.io/service-name=nginx-service
 ```
 
-`ENDPOINTS` sütunu nginx'in **pod IP**'sini gösterir. Boşsa, seçici çalışan hiçbir podla
+`ENDPOINTS` sütunu nginx'in **pod IP**'sini gösterir. Boşsa, selector çalışan hiçbir podla
 eşleşmiyor demektir.

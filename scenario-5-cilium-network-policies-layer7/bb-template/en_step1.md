@@ -4,8 +4,27 @@
 
 In this scenario you go beyond IPs and ports: you allow only specific **HTTP methods and
 paths** into an API, require a **header** for a sensitive call, and limit a pod's
-internet access to a single **domain name**. First, build the lab cluster: 1
-control-plane and 2 worker nodes, with Cilium as the network plugin (CNI).
+internet access to a single **domain name**.
+
+```
+ ns: frontend           ns: backend                       ns: database
+┌─────────────┐  8080  ┌───────────────────────────┐ 6379 ┌─────────────┐
+│ web         │──────▶ │ api (nginx)               │────▶ │ redis       │
+│ (netshoot)  │  HTTP  │  GET    /api/products     │      │  :6379      │
+└─────┬───────┘        │  GET    /api/orders       │      └─────────────┘
+      │ 443            │  POST   /api/orders       │
+      ▼                │  DELETE /api/orders/{id}  │
+ api.github.com        │  GET    /admin            │
+ (only this name)      └───────────────────────────┘
+ ns: default
+┌─────────────┐
+│ intruder    │   should be blocked everywhere
+│ (netshoot)  │
+└─────────────┘
+```
+
+First, build the lab cluster: 1 control-plane and 2 worker nodes, with Cilium as the
+network plugin (CNI).
 
 Write the kind configuration file and create the cluster. `disableDefaultCNI: true` turns
 off kind's default network plugin so that Cilium can manage pod networking:

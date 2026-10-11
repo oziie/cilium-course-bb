@@ -18,8 +18,7 @@ Adın nasıl çözümlendiğine bakın:
 kubectl exec pod/netshoot-client -- nslookup nginx-service
 ```
 
-Cevap, pod IP'si değil, Service'in **ClusterIP**'sidir. Küme DNS'i (CoreDNS) her zaman bu
-sabit adresi döndürür.
+Cevap, pod IP'si değil, Service'in **ClusterIP**'sidir. Cluster DNS'i (CoreDNS) her zaman bu sabit adresi döndürür.
 
 Şimdi ClusterIP'yi doğrudan çağırın ve yalnızca HTTP durum kodunu yazdırın:
 
@@ -28,5 +27,5 @@ CLUSTER_IP=$(kubectl get service nginx-service -o jsonpath='{.spec.clusterIP}')
 kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" http://$CLUSTER_IP
 ```
 
-Cevap `200` olur. İstemci ClusterIP ile konuşur ve istek yine diğer düğümdeki nginx
+Cevap `200` olur. İstemci ClusterIP ile konuşur ve istek yine diğer node daki nginx
 poduna ulaşır.

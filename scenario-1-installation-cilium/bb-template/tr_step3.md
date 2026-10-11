@@ -17,8 +17,8 @@ Cilium üç bileşenden oluşur:
 | Bileşen | Tür | Görevi |
 | --- | --- | --- |
 | `cilium` | DaemonSet (her düğümde bir pod) | agent: pod ağını yöneten eBPF programlarını yükler |
-| `cilium-envoy` | DaemonSet (her düğümde bir pod) | Katman 7 özellikleri için kullanılan Envoy proxy |
-| `cilium-operator` | Deployment (1 kopya) | tüm agent'ların ortak kullandığı kaynakları yönetmek gibi küme genelindeki işler |
+| `cilium-envoy` | DaemonSet (her düğümde bir pod) | Layer 7 özellikleri için kullanılan Envoy proxy |
+| `cilium-operator` | Deployment (1 kopya) | tüm agent'ların ortak kullandığı kaynakları yönetmek gibi cluster genelindeki işler |
 
 Bileşenleri kubectl ile kontrol edin:
 
@@ -30,7 +30,7 @@ kubectl get -n kube-system deployment cilium-operator
 İki DaemonSet de `3` istenen ve `3` hazır pod gösterir; her düğümde bir tane. Operator
 ise `1/1` gösterir.
 
-Artık bir CNI kurulu olduğu için küme normal çalışır:
+Artık bir CNI kurulu olduğu için cluster normal çalışır:
 
 ```bash
 kubectl get nodes

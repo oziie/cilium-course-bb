@@ -2,7 +2,7 @@
 
 #### Adım 3 — Yalnızca Mağazanın İhtiyaç Duyduğu Trafiğe İzin Verin
 
-**Ön yüzün API'yi yalnızca 8080 portundan çağırmasına izin verin:**
+**Frontend'in API'yi yalnızca 8080 portundan çağırmasına izin verin:**
 
 ```bash
 kubectl apply -f - <<EOF

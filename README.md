@@ -128,6 +128,11 @@ Reinstall Cilium in Cluster Scope IPAM mode (`cluster-pool`) with two small `/28
 
 Expose the Bookinfo app with the Cilium Ingress controller on a kube-proxy-free cluster: assign the Ingress an external IP with LB-IPAM, announce it with a Layer 2 announcement policy, and reach it with `curl` from outside the cluster.
 
+**Scenario 9 — Gateway API**
+[scenario-9-gatewayapi/](scenario-9-gatewayapi/)
+
+Install the Gateway API CRDs and expose Bookinfo through a Cilium `Gateway`: route by path with an `HTTPRoute`, then add a second team's `HTTPRoute` that runs a 90/10 canary of `reviews` with weights and a header match — things a plain `Ingress` cannot express.
+
 ---
 
 ## Repository Structure
@@ -192,15 +197,27 @@ Expose the Bookinfo app with the Cilium Ingress controller on a kube-proxy-free 
 │   ├── cilium-values.yaml
 │   ├── netshoot-client-pod.yaml
 │   └── nginx-deployment-10-replicas.yaml
-└── scenario-8-ingress/
-    ├── instructions-scenario-8.md
+├── scenario-8-ingress/
+│   ├── instructions-scenario-8.md
+│   ├── bb-template/
+│   ├── create-kind-cluster.sh
+│   ├── light-lab.yaml
+│   ├── cilium-values.yaml
+│   ├── ingress-basic.yaml
+│   ├── lb-ippool.yaml
+│   └── l2-announcement-policy.yaml
+└── scenario-9-gatewayapi/
+    ├── instructions-scenario-9.md
     ├── bb-template/
     ├── create-kind-cluster.sh
     ├── light-lab.yaml
     ├── cilium-values.yaml
-    ├── ingress-basic.yaml
     ├── lb-ippool.yaml
-    └── l2-announcement-policy.yaml
+    ├── l2-announcement-policy.yaml
+    ├── gateway.yaml
+    ├── httproute-bookinfo.yaml
+    ├── reviews-services.yaml
+    └── httproute-reviews-canary.yaml
 ```
 
 ## Bulut Bilisimciler Platform (`bb-template/`)
@@ -238,6 +255,7 @@ steps in both languages too.
 ## References
 
 - [Cilium Documentation](https://docs.cilium.io)
+- [Cilium: Up and Running Book](https://www.oreilly.com/library/view/cilium-up-and/9798341622982/)
 - [kind — Quick Start](https://kind.sigs.k8s.io/docs/user/quick-start/)
 - [eBPF.io](https://ebpf.io)
 - [Cilium GitHub](https://github.com/cilium/cilium)

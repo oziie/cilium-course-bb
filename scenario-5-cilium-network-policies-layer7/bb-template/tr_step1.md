@@ -1,11 +1,30 @@
-### Ağ Politikaları (Katman 7)
+### Ağ Politikaları (Layer 7)
 
 #### Adım 1 — Kümeyi Oluşturun ve Cilium'u Kurun
 
 Bu senaryoda IP ve portların ötesine geçeceksiniz: bir API'ye yalnızca belirli **HTTP
 metot ve yollarına** izin verecek, hassas bir çağrı için bir **header** zorunlu kılacak
-ve bir podun internet erişimini tek bir **alan adıyla** sınırlayacaksınız. Önce lab
-kümesini kurun: 1 control-plane ve 2 worker düğümü, ağ eklentisi (CNI) olarak Cilium.
+ve bir podun internet erişimini tek bir **alan adıyla** sınırlayacaksınız.
+
+```
+ ns: frontend           ns: backend                       ns: database
+┌─────────────┐  8080  ┌───────────────────────────┐ 6379 ┌─────────────┐
+│ web         │──────▶ │ api (nginx)               │────▶ │ redis       │
+│ (netshoot)  │  HTTP  │  GET    /api/products     │      │  :6379      │
+└─────┬───────┘        │  GET    /api/orders       │      └─────────────┘
+      │ 443            │  POST   /api/orders       │
+      ▼                │  DELETE /api/orders/{id}  │
+ api.github.com        │  GET    /admin            │
+ (yalnızca bu ad)      └───────────────────────────┘
+ ns: default
+┌─────────────┐
+│ intruder    │   her yerde engellenmeli
+│ (netshoot)  │
+└─────────────┘
+```
+
+Önce lab kümesini kurun: 1 control-plane ve 2 worker düğümü, ağ eklentisi (CNI)
+olarak Cilium.
 
 kind yapılandırma dosyasını yazın ve kümeyi oluşturun. `disableDefaultCNI: true`,
 kind'ın varsayılan ağ eklentisini kapatır; böylece pod ağını Cilium yönetebilir:

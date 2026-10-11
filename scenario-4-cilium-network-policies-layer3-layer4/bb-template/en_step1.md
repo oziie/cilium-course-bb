@@ -4,6 +4,21 @@
 
 In this scenario you lock down a small three-tier shop with `CiliumNetworkPolicy`. Each
 tier runs in its own namespace, and only the traffic each tier really needs is allowed.
+
+```
+ ns: frontend           ns: backend                   ns: database
+┌─────────────┐  8080  ┌───────────────────┐  6379   ┌─────────────┐
+│ web         │──────▶ │ api (nginx)       │──────▶  │ redis       │
+│ (netshoot)  │        │  :8080 public API │         │  :6379      │
+└─────────────┘        │  :9090 admin      │         └─────────────┘
+                       └───────────────────┘
+ ns: default
+┌─────────────┐
+│ intruder    │   should be blocked everywhere
+│ (netshoot)  │
+└─────────────┘
+```
+
 First, build the lab cluster: 1 control-plane and 2 worker nodes, with Cilium as the
 network plugin (CNI).
 
