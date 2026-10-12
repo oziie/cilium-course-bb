@@ -176,105 +176,18 @@ Look inside Cilium's data plane on a kube-proxy-free cluster: list the eBPF prog
 .
 ├── img/                          # diagrams used by the introduction (PNG + SVG sources)
 │   └── src/
-├── cilium-ebpf-introduction/
+├── cilium-ebpf-introduction/     # introduction for cilium and ebpf
 │   ├── introduction.md
-│   └── bb-template/              # 1 step: en_step1.md / tr_step1.md
-├── setup-ubuntu/
-│   ├── instructions-setup-ubuntu.md
-│   └── setup-ubuntu.sh
-├── scenario-1-installation-cilium/
-│   ├── instructions-scenario-1.md
-│   ├── bb-template/
-│   ├── create-kind-cluster.sh
-│   └── light-lab.yaml
-├── scenario-2-pod-connectivity/
-│   ├── instructions-scenario-2.md
-│   ├── bb-template/
-│   ├── create-kind-cluster.sh
-│   ├── light-lab.yaml
-│   ├── app-nginx.yaml
-│   └── app-netshoot.yaml
-├── scenario-3-service-connectivity/
-│   ├── instructions-scenario-3.md
-│   ├── bb-template/
-│   ├── create-kind-cluster.sh
-│   ├── light-lab.yaml
-│   ├── app-nginx.yaml
-│   ├── app-netshoot.yaml
-│   └── svc-nginx.yaml
-├── scenario-4-cilium-network-policies-layer3-layer4/
-│   ├── instructions-scenario-4.md
-│   ├── bb-template/
-│   ├── create-kind-cluster.sh
-│   ├── light-lab.yaml
-│   ├── namespaces.yaml
-│   ├── app-api.yaml
-│   ├── app-redis.yaml
-│   ├── app-clients.yaml
-│   ├── cnp-01-default-deny.yaml
-│   ├── cnp-02-allow-web-to-api.yaml
-│   ├── cnp-03-allow-api-to-redis.yaml
-│   ├── cnp-04-web-egress-no-dns.yaml
-│   └── cnp-04-web-egress.yaml
-├── scenario-5-cilium-network-policies-layer7/
-│   ├── instructions-scenario-5.md
-│   ├── bb-template/
-│   ├── create-kind-cluster.sh
-│   └── light-lab.yaml
-├── scenario-6-observability-with-hubble/
-│   ├── instructions-scenario-6.md
-│   ├── bb-template/
-│   ├── create-kind-cluster.sh
-│   ├── light-lab.yaml
-│   ├── app-nginx.yaml
-│   ├── app-netshoot.yaml
-│   └── svc-nginx.yaml
-├── scenario-7-cluster-scope-ipam/
-│   ├── instructions-scenario-7.md
-│   ├── bb-template/
-│   ├── create-kind-cluster.sh
-│   ├── light-lab.yaml
-│   ├── cilium-values.yaml
-│   ├── netshoot-client-pod.yaml
-│   └── nginx-deployment-10-replicas.yaml
-├── scenario-8-ingress/
-│   ├── instructions-scenario-8.md
-│   ├── bb-template/
-│   ├── create-kind-cluster.sh
-│   ├── light-lab.yaml
-│   ├── cilium-values.yaml
-│   ├── ingress-basic.yaml
-│   ├── lb-ippool.yaml
-│   └── l2-announcement-policy.yaml
-├── scenario-9-gatewayapi/
-│   ├── instructions-scenario-9.md
-│   ├── bb-template/
-│   ├── create-kind-cluster.sh
-│   ├── light-lab.yaml
-│   ├── cilium-values.yaml
-│   ├── lb-ippool.yaml
-│   ├── l2-announcement-policy.yaml
-│   ├── gateway.yaml
-│   ├── httproute-bookinfo.yaml
-│   ├── reviews-services.yaml
-│   └── httproute-reviews-canary.yaml
-├── scenario-10-egress-gateway/
-│   ├── instructions-scenario-10.md
-│   ├── bb-template/
-│   ├── create-kind-cluster.sh
-│   ├── light-lab.yaml
-│   ├── cilium-values.yaml
-│   ├── app-clients.yaml
-│   └── egress-gateway-policy.yaml
-└── scenario-11-ebpf-under-the-hood/
-    ├── instructions-scenario-11.md
-    ├── bb-template/
-    ├── create-kind-cluster.sh
-    ├── light-lab.yaml
-    ├── cilium-values.yaml
-    ├── app-nginx.yaml
-    ├── app-client.yaml
-    └── cnp-allow-frontend.yaml
+│   └── bb-template/
+├── setup-ubuntu/                     
+│   ├── instructions-setup-ubuntu.md  # preparation instructions for only self-provisioned lab platform (binaries etc.) 
+│   └── setup-ubuntu.sh               # scripted preparations steps for only self-provisioned lab platform
+├── scenario-1-installation-cilium/ 
+│   ├── instructions-scenario-1.md  # instructions/scenario steps for only self-provisioned lab platform
+│   ├── bb-template/              # scenario steps template for only BulutBilisimciler platform 
+│   ├── create-kind-cluster.sh    # scripted kind cluster installation for only self-provisioned lab platform
+│   └── light-lab.yaml            # kind cluster config for only self-provisioned lab platform
+├── ...                           # other scenarios have same repo structure
 ```
 
 ## Bulut Bilisimciler Platform (`bb-template/`)
