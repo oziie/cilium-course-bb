@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#374151"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="640" fill="#FFFFFF"/>
+  <text x="600" y="42" text-anchor="middle" font-size="26" font-weight="700" fill="#111827">From iptables chains to an eBPF datapath</text>
+
+  <!-- left panel -->
+  <rect x="40" y="70" width="540" height="540" rx="14" fill="#FEF2F2" stroke="#DC2626" stroke-width="2"/>
+  <text x="310" y="104" text-anchor="middle" font-size="20" font-weight="700" fill="#991B1B">Classic datapath: iptables (kube-proxy)</text>
+
+  <text x="80" y="150" font-size="16" fill="#111827">packet to a Service IP</text>
+  <line x1="150" y1="160" x2="150" y2="186" stroke="#374151" stroke-width="2" marker-end="url(#arr)"/>
+  <g font-size="15" fill="#111827">
+    <rect x="80" y="190" width="300" height="38" rx="6" fill="#FFFFFF" stroke="#DC2626"/>
+    <text x="95" y="215">rule 1 — no match</text>
+    <rect x="80" y="236" width="300" height="38" rx="6" fill="#FFFFFF" stroke="#DC2626"/>
+    <text x="95" y="261">rule 2 — no match</text>
+    <rect x="80" y="282" width="300" height="38" rx="6" fill="#FFFFFF" stroke="#DC2626"/>
+    <text x="95" y="307">rule 3 — no match</text>
+    <text x="230" y="350" text-anchor="middle" font-size="22" fill="#991B1B">⋮</text>
+    <rect x="80" y="366" width="300" height="38" rx="6" fill="#FEE2E2" stroke="#DC2626" stroke-width="2"/>
+    <text x="95" y="391" font-weight="700">rule 10,000 — match → DNAT</text>
+  </g>
+  <g stroke="#DC2626" stroke-width="2" marker-end="url(#arr)">
+    <line x1="395" y1="209" x2="395" y2="380"/>
+  </g>
+  <text x="410" y="290" font-size="15" fill="#991B1B" font-weight="700">checked</text>
+  <text x="410" y="310" font-size="15" fill="#991B1B" font-weight="700">one by one</text>
+
+  <g font-size="16" fill="#111827">
+    <text x="70" y="450">✗  cost grows with every Service and rule: O(n)</text>
+    <text x="70" y="482">✗  changes rewrite large rule tables</text>
+    <text x="70" y="514">✗  works on IP addresses, which pods</text>
+    <text x="97" y="536">change all the time</text>
+    <text x="70" y="568">✗  built for host firewalls, not for</text>
+    <text x="97" y="590">thousands of short-lived pods</text>
+  </g>
+
+  <!-- right panel -->
+  <rect x="620" y="70" width="540" height="540" rx="14" fill="#F0FDF4" stroke="#16A34A" stroke-width="2"/>
+  <text x="890" y="104" text-anchor="middle" font-size="20" font-weight="700" fill="#166534">Modern datapath: eBPF (Cilium)</text>
+
+  <text x="660" y="150" font-size="16" fill="#111827">packet to a Service IP</text>
+  <line x1="730" y1="160" x2="730" y2="186" stroke="#374151" stroke-width="2" marker-end="url(#arr)"/>
+  <rect x="660" y="190" width="160" height="70" rx="8" fill="#FEF3C7" stroke="#D97706" stroke-width="2"/>
+  <text x="740" y="220" text-anchor="middle" font-size="16" font-weight="700" fill="#111827">eBPF program</text>
+  <text x="740" y="243" text-anchor="middle" font-size="13" fill="#4B5563">at the interface</text>
+  <line x1="820" y1="225" x2="868" y2="225" stroke="#374151" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="844" y="214" text-anchor="middle" font-size="13" fill="#4B5563">lookup</text>
+
+  <rect x="872" y="180" width="270" height="190" rx="8" fill="#FFFFFF" stroke="#16A34A" stroke-width="2"/>
+  <text x="1007" y="204" text-anchor="middle" font-size="15" font-weight="700" fill="#166534">eBPF map (hash table)</text>
+  <g font-size="13" fill="#111827">
+    <line x1="872" y1="214" x2="1142" y2="214" stroke="#16A34A"/>
+    <text x="884" y="234" font-weight="700">key (Service)</text><text x="1010" y="234" font-weight="700">value (backends)</text>
+    <line x1="872" y1="244" x2="1142" y2="244" stroke="#BBF7D0"/>
+    <text x="884" y="264">10.96.0.10:53</text><text x="1010" y="264">2 pods</text>
+    <rect x="873" y="274" width="268" height="28" fill="#DCFCE7"/>
+    <text x="884" y="293" font-weight="700">10.96.112.40:80</text><text x="1010" y="293" font-weight="700">4 pods ✓</text>
+    <text x="884" y="324">10.96.48.3:443</text><text x="1010" y="324">3 pods</text>
+    <text x="1007" y="355" text-anchor="middle" fill="#4B5563">… 10,000 more</text>
+  </g>
+  <line x1="740" y1="260" x2="740" y2="378" stroke="#374151" stroke-width="2" marker-end="url(#arr)"/>
+  <rect x="660" y="382" width="250" height="40" rx="8" fill="#DCFCE7" stroke="#16A34A" stroke-width="2"/>
+  <text x="785" y="408" text-anchor="middle" font-size="15" font-weight="700" fill="#111827">forward to 10.244.2.15:80</text>
+
+  <g font-size="16" fill="#111827">
+    <text x="650" y="450">✓  one hash lookup, same cost for 10 or</text>
+    <text x="677" y="472">10,000 Services: O(1)</text>
+    <text x="650" y="504">✓  a change updates one map entry in place</text>
+    <text x="650" y="536">✓  works on identities, not only IPs</text>
+    <text x="650" y="568">✓  programmable: policy, L7, observability</text>
+  </g>
+</svg>

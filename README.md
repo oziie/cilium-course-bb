@@ -40,6 +40,16 @@ pre-installed, and each scenario's first step creates the cluster (see
 
 ## Course Content
 
+### Introduction — Cilium & eBPF
+
+**[cilium-ebpf-introduction/introduction.md](cilium-ebpf-introduction/introduction.md)**
+
+Read this first. Why Kubernetes needs a CNI plugin, how datapaths moved from iptables to
+eBPF, what eBPF is, how Cilium is built, and when to pick it. The diagrams live in
+[`img/`](img/) (PNG files, with their SVG sources in `img/src/`).
+
+---
+
 ### Module 0 — Environment
 
 **Setup — Preparing an Ubuntu Host**
@@ -157,6 +167,11 @@ Look inside Cilium's data plane on a kube-proxy-free cluster: list the eBPF prog
 
 ```
 .
+├── img/                          # diagrams used by the introduction (PNG + SVG sources)
+│   └── src/
+├── cilium-ebpf-introduction/
+│   ├── introduction.md
+│   └── bb-template/              # 1 step: en_step1.md / tr_step1.md
 ├── setup-ubuntu/
 │   ├── instructions-setup-ubuntu.md
 │   └── setup-ubuntu.sh

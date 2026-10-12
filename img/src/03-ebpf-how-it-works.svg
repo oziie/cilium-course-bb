@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#374151"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="700" fill="#FFFFFF"/>
+  <text x="600" y="42" text-anchor="middle" font-size="26" font-weight="700" fill="#111827">How an eBPF program gets into the kernel and runs</text>
+
+  <!-- bands -->
+  <rect x="40" y="66" width="1120" height="170" rx="12" fill="#F3F4F6" stroke="#9CA3AF" stroke-width="2"/>
+  <text x="58" y="90" font-size="14" font-weight="700" fill="#6B7280" letter-spacing="1">USER SPACE</text>
+  <rect x="40" y="262" width="1120" height="400" rx="12" fill="#E0F2FE" stroke="#0284C7" stroke-width="2"/>
+  <text x="58" y="286" font-size="14" font-weight="700" fill="#0369A1" letter-spacing="1">LINUX KERNEL</text>
+
+  <!-- user space boxes -->
+  <g text-anchor="middle">
+    <rect x="70" y="105" width="230" height="95" rx="10" fill="#FEF3C7" stroke="#D97706" stroke-width="2"/>
+    <text x="185" y="142" font-size="17" font-weight="700" fill="#111827">eBPF program</text>
+    <text x="185" y="166" font-size="14" fill="#4B5563">small function written</text>
+    <text x="185" y="185" font-size="14" fill="#4B5563">in restricted C</text>
+
+    <rect x="350" y="105" width="230" height="95" rx="10" fill="#FFFFFF" stroke="#374151" stroke-width="2"/>
+    <text x="465" y="142" font-size="17" font-weight="700" fill="#111827">clang / LLVM</text>
+    <text x="465" y="166" font-size="14" fill="#4B5563">compiles it to</text>
+    <text x="465" y="185" font-size="14" fill="#4B5563">eBPF bytecode</text>
+
+    <rect x="630" y="105" width="230" height="95" rx="10" fill="#EDE9FE" stroke="#7C3AED" stroke-width="2"/>
+    <text x="745" y="142" font-size="17" font-weight="700" fill="#111827">loader (cilium-agent)</text>
+    <text x="745" y="166" font-size="14" fill="#4B5563">bpf() system call:</text>
+    <text x="745" y="185" font-size="14" fill="#4B5563">load programs, fill maps</text>
+
+    <rect x="910" y="105" width="220" height="95" rx="10" fill="#EDE9FE" stroke="#7C3AED" stroke-width="2"/>
+    <text x="1020" y="142" font-size="17" font-weight="700" fill="#111827">user-space tools</text>
+    <text x="1020" y="166" font-size="14" fill="#4B5563">cilium-dbg, Hubble,</text>
+    <text x="1020" y="185" font-size="14" fill="#4B5563">bpftool</text>
+  </g>
+  <g stroke="#374151" stroke-width="2" fill="none">
+    <line x1="300" y1="152" x2="348" y2="152" marker-end="url(#arr)"/>
+    <line x1="580" y1="152" x2="628" y2="152" marker-end="url(#arr)"/>
+  </g>
+
+  <!-- kernel row 1 -->
+  <g text-anchor="middle">
+    <rect x="630" y="310" width="230" height="95" rx="10" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
+    <text x="745" y="345" font-size="17" font-weight="700" fill="#111827">① Verifier</text>
+    <text x="745" y="368" font-size="14" fill="#4B5563">always finishes? only safe</text>
+    <text x="745" y="387" font-size="14" fill="#4B5563">memory access? else: rejected</text>
+
+    <rect x="350" y="310" width="230" height="95" rx="10" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
+    <text x="465" y="345" font-size="17" font-weight="700" fill="#111827">② JIT compiler</text>
+    <text x="465" y="368" font-size="14" fill="#4B5563">bytecode → native</text>
+    <text x="465" y="387" font-size="14" fill="#4B5563">machine code</text>
+
+    <rect x="910" y="310" width="220" height="95" rx="10" fill="#DCFCE7" stroke="#16A34A" stroke-width="2"/>
+    <text x="1020" y="345" font-size="17" font-weight="700" fill="#111827">eBPF maps</text>
+    <text x="1020" y="368" font-size="14" fill="#4B5563">key/value stores:</text>
+    <text x="1020" y="387" font-size="14" fill="#4B5563">state, config, counters</text>
+
+    <rect x="910" y="470" width="220" height="125" rx="10" fill="#FFFFFF" stroke="#0284C7" stroke-width="2"/>
+    <text x="1020" y="515" font-size="17" font-weight="700" fill="#111827">ring buffer</text>
+    <text x="1020" y="540" font-size="14" fill="#4B5563">events sent to</text>
+    <text x="1020" y="559" font-size="14" fill="#4B5563">user space</text>
+  </g>
+
+  <!-- hooks grid -->
+  <rect x="56" y="436" width="542" height="172" rx="12" fill="none" stroke="#D97706" stroke-width="2" stroke-dasharray="7 5"/>
+  <text x="70" y="458" font-size="15" font-weight="700" fill="#111827">③ attached to hooks: events that run the program</text>
+  <g text-anchor="middle" font-size="15" fill="#111827">
+    <rect x="70" y="472" width="245" height="56" rx="8" fill="#FEF3C7" stroke="#D97706" stroke-width="2"/>
+    <text x="192" y="505">network interface (XDP, tc)</text>
+    <rect x="335" y="472" width="245" height="56" rx="8" fill="#FEF3C7" stroke="#D97706" stroke-width="2"/>
+    <text x="457" y="505">sockets</text>
+    <rect x="70" y="540" width="245" height="56" rx="8" fill="#FEF3C7" stroke="#D97706" stroke-width="2"/>
+    <text x="192" y="573">system calls</text>
+    <rect x="335" y="540" width="245" height="56" rx="8" fill="#FEF3C7" stroke="#D97706" stroke-width="2"/>
+    <text x="457" y="573">kprobes / tracepoints</text>
+  </g>
+  <text x="327" y="636" text-anchor="middle" font-size="14" fill="#4B5563">e.g. "a packet arrived on eth0" → the program runs for that packet</text>
+
+  <!-- arrows -->
+  <g stroke="#374151" stroke-width="2" fill="none">
+    <line x1="745" y1="200" x2="745" y2="308" marker-end="url(#arr)"/>
+    <line x1="630" y1="357" x2="582" y2="357" marker-end="url(#arr)"/>
+    <line x1="465" y1="405" x2="465" y2="434" marker-end="url(#arr)"/>
+    <line x1="845" y1="200" x2="935" y2="308" marker-end="url(#arr)"/>
+    <line x1="1020" y1="308" x2="1020" y2="202" marker-end="url(#arr)"/>
+    <path d="M600,505 H895 V357 H908" marker-end="url(#arr)" marker-start="url(#arr)"/>
+    <path d="M600,567 H908" marker-end="url(#arr)"/>
+    <path d="M1130,532 H1148 V152 H1132" marker-end="url(#arr)"/>
+  </g>
+  <g font-size="13" fill="#374151" font-weight="700">
+    <text x="752" y="252">load</text>
+    <text x="900" y="238">write</text>
+    <text x="1028" y="252">read</text>
+    <text x="690" y="497">program reads / writes maps</text>
+    <text x="690" y="559">program emits events</text>
+  </g>
+</svg>

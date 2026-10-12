@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="710" viewBox="0 0 1200 710" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#374151"/>
+    </marker>
+    <g id="node">
+      <rect x="0" y="0" width="540" height="420" rx="12" fill="#F9FAFB" stroke="#9CA3AF" stroke-width="2"/>
+      <!-- cilium-agent -->
+      <rect x="20" y="40" width="320" height="100" rx="10" fill="#EDE9FE" stroke="#7C3AED" stroke-width="2"/>
+      <text x="180" y="66" text-anchor="middle" font-size="17" font-weight="700" fill="#111827">cilium-agent (DaemonSet)</text>
+      <text x="180" y="89" text-anchor="middle" font-size="14" fill="#4B5563">watches Kubernetes, builds the eBPF</text>
+      <text x="180" y="108" text-anchor="middle" font-size="14" fill="#4B5563">programs and fills the maps</text>
+      <text x="180" y="129" text-anchor="middle" font-size="13" font-weight="700" fill="#6D28D9">+ Hubble server (flow events)</text>
+      <!-- envoy -->
+      <rect x="360" y="40" width="160" height="100" rx="10" fill="#EDE9FE" stroke="#7C3AED" stroke-width="2"/>
+      <text x="440" y="66" text-anchor="middle" font-size="17" font-weight="700" fill="#111827">cilium-envoy</text>
+      <text x="440" y="89" text-anchor="middle" font-size="14" fill="#4B5563">L7 proxy: HTTP</text>
+      <text x="440" y="108" text-anchor="middle" font-size="14" fill="#4B5563">policy, Ingress,</text>
+      <text x="440" y="127" text-anchor="middle" font-size="14" fill="#4B5563">Gateway API</text>
+      <!-- pods + cni -->
+      <rect x="20" y="175" width="110" height="60" rx="8" fill="#FFFFFF" stroke="#374151" stroke-width="2"/>
+      <text x="75" y="211" text-anchor="middle" font-size="16" font-weight="700" fill="#111827">Pod</text>
+      <rect x="145" y="175" width="110" height="60" rx="8" fill="#FFFFFF" stroke="#374151" stroke-width="2"/>
+      <text x="200" y="211" text-anchor="middle" font-size="16" font-weight="700" fill="#111827">Pod</text>
+      <rect x="300" y="175" width="170" height="60" rx="8" fill="#DBEAFE" stroke="#2563EB" stroke-width="2"/>
+      <text x="385" y="200" text-anchor="middle" font-size="15" font-weight="700" fill="#111827">cilium-cni</text>
+      <text x="385" y="221" text-anchor="middle" font-size="13" fill="#4B5563">called by kubelet</text>
+      <!-- kernel -->
+      <rect x="10" y="260" width="520" height="150" rx="10" fill="#E0F2FE" stroke="#0284C7" stroke-width="2"/>
+      <text x="385" y="279" text-anchor="middle" font-size="12" font-weight="700" fill="#0369A1" letter-spacing="1">LINUX KERNEL</text>
+      <rect x="20" y="288" width="230" height="46" rx="8" fill="#FEF3C7" stroke="#D97706" stroke-width="2"/>
+      <text x="135" y="316" text-anchor="middle" font-size="14" fill="#111827">eBPF on lxc (one per pod)</text>
+      <rect x="265" y="288" width="120" height="46" rx="8" fill="#FEF3C7" stroke="#D97706" stroke-width="2"/>
+      <text x="325" y="316" text-anchor="middle" font-size="14" fill="#111827">eBPF on eth0</text>
+      <rect x="400" y="288" width="120" height="46" rx="8" fill="#FEF3C7" stroke="#D97706" stroke-width="2"/>
+      <text x="460" y="316" text-anchor="middle" font-size="14" fill="#111827">cilium_vxlan</text>
+      <rect x="20" y="350" width="500" height="46" rx="8" fill="#DCFCE7" stroke="#16A34A" stroke-width="2"/>
+      <text x="270" y="378" text-anchor="middle" font-size="14" fill="#111827"><tspan font-weight="700">eBPF maps:</tspan> Services · identities · policies · connection tracking</text>
+      <!-- in-node arrows -->
+      <g stroke="#374151" stroke-width="2" fill="none">
+        <line x1="75" y1="235" x2="75" y2="286"/>
+        <line x1="200" y1="235" x2="200" y2="286"/>
+        <line x1="275" y1="140" x2="275" y2="258" marker-end="url(#arr)"/>
+        <line x1="495" y1="142" x2="495" y2="258" marker-start="url(#arr)" marker-end="url(#arr)"/>
+      </g>
+      <text x="284" y="160" font-size="13" font-weight="700" fill="#374151">loads programs, writes maps</text>
+    </g>
+  </defs>
+  <rect width="1200" height="710" fill="#FFFFFF"/>
+  <text x="600" y="42" text-anchor="middle" font-size="26" font-weight="700" fill="#111827">Cilium architecture</text>
+
+  <!-- cluster-wide components -->
+  <g text-anchor="middle">
+    <rect x="60" y="80" width="220" height="80" rx="10" fill="#DBEAFE" stroke="#2563EB" stroke-width="2"/>
+    <text x="170" y="114" font-size="17" font-weight="700" fill="#111827">kube-apiserver</text>
+    <text x="170" y="138" font-size="14" fill="#4B5563">Pods, Services, policies</text>
+
+    <rect x="320" y="80" width="320" height="80" rx="10" fill="#EDE9FE" stroke="#7C3AED" stroke-width="2"/>
+    <text x="480" y="114" font-size="17" font-weight="700" fill="#111827">cilium-operator (Deployment)</text>
+    <text x="480" y="138" font-size="14" fill="#4B5563">cluster-wide tasks: IPAM, CRDs, cleanup</text>
+
+    <rect x="720" y="80" width="200" height="80" rx="10" fill="#EDE9FE" stroke="#7C3AED" stroke-width="2"/>
+    <text x="820" y="114" font-size="17" font-weight="700" fill="#111827">Hubble Relay</text>
+    <text x="820" y="138" font-size="14" fill="#4B5563">flows from all nodes</text>
+
+    <rect x="960" y="80" width="190" height="80" rx="10" fill="#FFFFFF" stroke="#374151" stroke-width="2"/>
+    <text x="1055" y="114" font-size="17" font-weight="700" fill="#111827">Hubble UI / CLI</text>
+    <text x="1055" y="138" font-size="14" fill="#4B5563">you, watching flows</text>
+  </g>
+  <text x="300" y="192" font-size="13" font-weight="700" fill="#374151">every agent watches the API</text>
+  <text x="890" y="215" font-size="13" font-weight="700" fill="#374151">flows</text>
+
+  <!-- nodes -->
+  <use href="#node" xlink:href="#node" x="40" y="230"/>
+  <use href="#node" xlink:href="#node" x="620" y="230"/>
+  <text x="60" y="256" font-size="17" font-weight="700" fill="#374151">Node 1</text>
+  <text x="640" y="256" font-size="17" font-weight="700" fill="#374151">Node 2</text>
+  <g stroke="#374151" stroke-width="2" fill="none">
+    <line x1="282" y1="120" x2="318" y2="120" marker-start="url(#arr)" marker-end="url(#arr)"/>
+    <line x1="920" y1="120" x2="958" y2="120" marker-end="url(#arr)"/>
+    <path d="M170,160 V268" marker-end="url(#arr)"/>
+    <path d="M170,200 H760 V268" marker-end="url(#arr)"/>
+    <path d="M880,268 V162" marker-end="url(#arr)"/>
+  </g>
+  <line x1="560" y1="541" x2="638" y2="541" stroke="#D97706" stroke-width="3" marker-start="url(#arr)" marker-end="url(#arr)"/>
+
+  <text x="600" y="690" text-anchor="middle" font-size="15" fill="#374151">Pods on different nodes reach each other through the cilium_vxlan tunnel (or native routing). Packets are handled by eBPF in the kernel, not by the agent.</text>
+</svg>
