@@ -1,0 +1,16 @@
+# Cilium Helm values for Scenario 10 (Egress Gateway).
+# Scenario 1 settings plus kube-proxy replacement, BPF masquerading and the
+# Egress Gateway, which needs both. create-kind-cluster.sh also sets
+# cluster.name, k8sServiceHost and k8sServicePort, which kube-proxy
+# replacement needs.
+operator:
+  replicas: 1
+routingMode: tunnel
+tunnelProtocol: vxlan
+kubeProxyReplacement: true
+ipam:
+  mode: kubernetes
+bpf:
+  masquerade: true
+egressGateway:
+  enabled: true

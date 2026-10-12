@@ -135,6 +135,15 @@ Install the Gateway API CRDs and expose Bookinfo through a Cilium `Gateway`: rou
 
 ---
 
+### Module 7 — Egress Traffic
+
+**Scenario 10 — Egress Gateway**
+[scenario-10-egress-gateway/](scenario-10-egress-gateway/)
+
+Give one application a fixed source IP for traffic leaving the cluster: see pods leave with their node's IP by default, then apply a `CiliumEgressGatewayPolicy` that sends the `payments` pod's traffic out through a labelled gateway node, inspect the BPF egress map, and see the traffic dropped when no gateway is available.
+
+---
+
 ## Repository Structure
 
 ```
@@ -206,18 +215,26 @@ Install the Gateway API CRDs and expose Bookinfo through a Cilium `Gateway`: rou
 │   ├── ingress-basic.yaml
 │   ├── lb-ippool.yaml
 │   └── l2-announcement-policy.yaml
-└── scenario-9-gatewayapi/
-    ├── instructions-scenario-9.md
+├── scenario-9-gatewayapi/
+│   ├── instructions-scenario-9.md
+│   ├── bb-template/
+│   ├── create-kind-cluster.sh
+│   ├── light-lab.yaml
+│   ├── cilium-values.yaml
+│   ├── lb-ippool.yaml
+│   ├── l2-announcement-policy.yaml
+│   ├── gateway.yaml
+│   ├── httproute-bookinfo.yaml
+│   ├── reviews-services.yaml
+│   └── httproute-reviews-canary.yaml
+└── scenario-10-egress-gateway/
+    ├── instructions-scenario-10.md
     ├── bb-template/
     ├── create-kind-cluster.sh
     ├── light-lab.yaml
     ├── cilium-values.yaml
-    ├── lb-ippool.yaml
-    ├── l2-announcement-policy.yaml
-    ├── gateway.yaml
-    ├── httproute-bookinfo.yaml
-    ├── reviews-services.yaml
-    └── httproute-reviews-canary.yaml
+    ├── app-clients.yaml
+    └── egress-gateway-policy.yaml
 ```
 
 ## Bulut Bilisimciler Platform (`bb-template/`)

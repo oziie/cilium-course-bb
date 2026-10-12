@@ -1,0 +1,20 @@
+apiVersion: cilium.io/v2
+kind: CiliumEgressGatewayPolicy
+metadata:
+  name: payments-egress
+spec:
+  # Which pods: the "payments" pod in the default namespace.
+  selectors:
+    - podSelector:
+        matchLabels:
+          app: payments
+          io.kubernetes.pod.namespace: default
+  # Which destinations: everything outside the cluster.
+  destinationCIDRs:
+    - "0.0.0.0/0"
+  # Which node sends the traffic out. With no egressIP or interface set,
+  # Cilium uses the IP of the gateway node's default-route interface (eth0).
+  egressGateway:
+    nodeSelector:
+      matchLabels:
+        egress-gateway: "true"

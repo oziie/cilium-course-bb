@@ -1,0 +1,29 @@
+# Two client pods on the same node (kind-worker). Only "payments" will be
+# selected by the egress gateway policy; "catalog" is the control group.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: payments
+  labels:
+    app: payments
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: kind-worker
+  containers:
+    - name: netshoot
+      image: nicolaka/netshoot
+      command: ["sleep", "infinity"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: catalog
+  labels:
+    app: catalog
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: kind-worker
+  containers:
+    - name: netshoot
+      image: nicolaka/netshoot
+      command: ["sleep", "infinity"]
