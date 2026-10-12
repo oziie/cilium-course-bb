@@ -2,6 +2,13 @@
 
 > This repository contains the hands-on lab scenarios for the **Cilium & eBPF** course published on the [Bulut Bilisimciler](https://bulutbilisimciler.com) internal learning platform.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="img/cilium-logo-dark.svg">
+    <img src="img/cilium-logo.svg" alt="Cilium logo" width="400">
+  </picture>
+</p>
+
 ## About the Course
 
 This course provides a practical introduction to **Cilium** and **eBPF** in the context of Kubernetes networking. Learners will start from installation and progressively explore Cilium's core features — pod and service connectivity, network policy enforcement at L3/L4 and L7, and deep observability through Hubble.
