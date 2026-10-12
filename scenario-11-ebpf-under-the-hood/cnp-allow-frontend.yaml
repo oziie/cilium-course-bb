@@ -1,0 +1,18 @@
+# Only pods labelled app=frontend may reach nginx on port 80/TCP.
+# Everything else to nginx is dropped by the eBPF program in front of the pod.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-frontend-to-nginx
+spec:
+  endpointSelector:
+    matchLabels:
+      app: nginx
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app: frontend
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP

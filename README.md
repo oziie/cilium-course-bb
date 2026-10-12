@@ -144,6 +144,15 @@ Give one application a fixed source IP for traffic leaving the cluster: see pods
 
 ---
 
+### Module 8 — eBPF Internals
+
+**Scenario 11 — eBPF Under the Hood**
+[scenario-11-ebpf-under-the-hood/](scenario-11-ebpf-under-the-hood/)
+
+Look inside Cilium's data plane on a kube-proxy-free cluster: list the eBPF programs attached to each interface with `bpftool`, read the Service and policy maps with `cilium-dbg`, scale a Deployment to see only map entries change (and no `KUBE-SVC` iptables rules), and watch a policy drop arrive as an event from the kernel.
+
+---
+
 ## Repository Structure
 
 ```
@@ -227,14 +236,23 @@ Give one application a fixed source IP for traffic leaving the cluster: see pods
 │   ├── httproute-bookinfo.yaml
 │   ├── reviews-services.yaml
 │   └── httproute-reviews-canary.yaml
-└── scenario-10-egress-gateway/
-    ├── instructions-scenario-10.md
+├── scenario-10-egress-gateway/
+│   ├── instructions-scenario-10.md
+│   ├── bb-template/
+│   ├── create-kind-cluster.sh
+│   ├── light-lab.yaml
+│   ├── cilium-values.yaml
+│   ├── app-clients.yaml
+│   └── egress-gateway-policy.yaml
+└── scenario-11-ebpf-under-the-hood/
+    ├── instructions-scenario-11.md
     ├── bb-template/
     ├── create-kind-cluster.sh
     ├── light-lab.yaml
     ├── cilium-values.yaml
-    ├── app-clients.yaml
-    └── egress-gateway-policy.yaml
+    ├── app-nginx.yaml
+    ├── app-client.yaml
+    └── cnp-allow-frontend.yaml
 ```
 
 ## Bulut Bilisimciler Platform (`bb-template/`)

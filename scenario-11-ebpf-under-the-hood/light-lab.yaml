@@ -1,0 +1,9 @@
+kind: Cluster # Declares a kind cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+networking:
+  disableDefaultCNI: true # Disables kindnetd prior to Cilium install
+  kubeProxyMode: none     # Scenario 11: no kube-proxy, Services are handled by Cilium's eBPF programs

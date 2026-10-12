@@ -1,0 +1,15 @@
+# Client pod on kind-worker. Its label (app=client) is not allowed by
+# cnp-allow-frontend.yaml until you relabel it to app=frontend.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client
+  labels:
+    app: client
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: kind-worker
+  containers:
+    - name: netshoot
+      image: nicolaka/netshoot
+      command: ["sleep", "infinity"]

@@ -1,0 +1,12 @@
+# Cilium Helm values for Scenario 11 (eBPF under the hood).
+# Scenario 1 settings plus kube-proxy replacement, so Service load balancing
+# runs in eBPF instead of iptables. create-kind-cluster.sh also sets
+# cluster.name, k8sServiceHost and k8sServicePort, which kube-proxy
+# replacement needs.
+operator:
+  replicas: 1
+routingMode: tunnel
+tunnelProtocol: vxlan
+kubeProxyReplacement: true
+ipam:
+  mode: kubernetes
