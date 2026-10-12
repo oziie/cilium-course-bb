@@ -37,6 +37,23 @@ helm install cilium cilium/cilium -n kube-system \
 cilium status --wait
 ```
 
+Install the `hubble` CLI from the same minor release as Cilium (1.18). A newer CLI asks the
+Hubble server for flow fields that Cilium 1.18 does not know, and `hubble observe` then
+fails with `invalid fieldmask`:
+
+```bash
+HUBBLE_VERSION=v1.18.6
+HUBBLE_ARCH=$(dpkg --print-architecture)
+curl -fsSL --remote-name-all \
+  "https://github.com/cilium/hubble/releases/download/${HUBBLE_VERSION}/hubble-linux-${HUBBLE_ARCH}.tar.gz{,.sha256sum}"
+sha256sum --check "hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum"
+sudo tar -C /usr/local/bin -xzf "hubble-linux-${HUBBLE_ARCH}.tar.gz"
+rm "hubble-linux-${HUBBLE_ARCH}.tar.gz"{,.sha256sum}
+hubble version
+```
+
+`hubble version` shows `hubble v1.18.6`.
+
 Deploy the applications: nginx on `kind-worker2`, a client pod on `kind-worker`, and a
 `nginx-service` Service in front of nginx:
 

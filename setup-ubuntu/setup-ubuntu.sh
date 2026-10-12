@@ -131,14 +131,21 @@ install_helm() {
 }
 
 # cilium-cli and hubble-cli ship identical release layouts.
+# An optional 4th argument pins the version: an installed binary of another
+# version is then replaced instead of skipped.
 install_cilium_style_cli() {
-  local name="$1" repo="$2" binary="$3"
+  local name="$1" repo="$2" binary="$3" pinned="${4:-}"
   if have "$binary"; then
-    info "${name} already installed at $(command -v "$binary")"
-    return
+    local current
+    current=$("$binary" version 2>/dev/null | awk '{print $2; exit}' | cut -d@ -f1)
+    if [[ -z "$pinned" || "v${current#v}" == "$pinned" ]]; then
+      info "${name} already installed at $(command -v "$binary")"
+      return
+    fi
+    warn "${name} ${current:-unknown} found, replacing it with the pinned ${pinned}"
   fi
   local ver tarball
-  ver=$(curl -fsSL "https://raw.githubusercontent.com/${repo}/main/stable.txt")
+  ver=${pinned:-$(curl -fsSL "https://raw.githubusercontent.com/${repo}/main/stable.txt")}
   tarball="${binary}-linux-${ARCH}.tar.gz"
   info "Installing ${name} ${ver}"
   curl -fsSL --remote-name-all \
@@ -167,7 +174,9 @@ install_kubectl
 install_kind
 install_helm
 install_cilium_style_cli "cilium-cli" "cilium/cilium-cli" "cilium"
-install_cilium_style_cli "hubble-cli" "cilium/hubble"     "hubble"
+# hubble-cli must match the Cilium minor version the labs install (1.18): a
+# newer CLI fails against Cilium 1.18 with "invalid fieldmask".
+install_cilium_style_cli "hubble-cli" "cilium/hubble"     "hubble" "v1.18.6"
 tune_inotify
 
 cat <<'NEXT'

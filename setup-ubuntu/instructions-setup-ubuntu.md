@@ -135,10 +135,11 @@ cilium version --client
 
 ### 6. Install the Hubble CLI
 
-Needed in Scenario 6 (Observability).
+Needed in Scenario 6 (Observability). The version is pinned to the Cilium minor release the
+labs install (1.18): a newer CLI fails against Cilium 1.18 with `invalid fieldmask`.
 
 ```bash
-HUBBLE_VERSION=$(curl -fsSL https://raw.githubusercontent.com/cilium/hubble/main/stable.txt)
+HUBBLE_VERSION=v1.18.6
 HUBBLE_ARCH=$(dpkg --print-architecture)
 
 curl -fsSL --remote-name-all \

@@ -38,6 +38,23 @@ helm install cilium cilium/cilium -n kube-system \
 cilium status --wait
 ```
 
+`hubble` CLI'ı Cilium ile aynı ara sürümden (1.18) kurun. Daha yeni bir CLI, Hubble
+sunucusundan Cilium 1.18'in tanımadığı akış alanlarını ister ve `hubble observe`
+`invalid fieldmask` hatasıyla başarısız olur:
+
+```bash
+HUBBLE_VERSION=v1.18.6
+HUBBLE_ARCH=$(dpkg --print-architecture)
+curl -fsSL --remote-name-all \
+  "https://github.com/cilium/hubble/releases/download/${HUBBLE_VERSION}/hubble-linux-${HUBBLE_ARCH}.tar.gz{,.sha256sum}"
+sha256sum --check "hubble-linux-${HUBBLE_ARCH}.tar.gz.sha256sum"
+sudo tar -C /usr/local/bin -xzf "hubble-linux-${HUBBLE_ARCH}.tar.gz"
+rm "hubble-linux-${HUBBLE_ARCH}.tar.gz"{,.sha256sum}
+hubble version
+```
+
+`hubble version` çıktısında `hubble v1.18.6` görünür.
+
 Uygulamaları dağıtın: `kind-worker2` üzerinde nginx, `kind-worker` üzerinde bir istemci
 podu ve nginx'in önünde `nginx-service` adlı bir Service:
 
