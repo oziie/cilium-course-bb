@@ -13,11 +13,15 @@ hubble observe --to-pod default/nginx-deployment --last 10
 hubble observe --port 53 --last 10
 
 # Only what happens on one node
-hubble observe --node kind-worker2 --last 10
+hubble observe --node-name kind-worker2 --last 10
 ```
 
 `--to-pod default/nginx-deployment` matches every pod whose name **starts with**
 `nginx-deployment`, so you don't need the random suffix.
+
+> **Note:** To see which node recorded each flow, add `--print-node-name` to any
+> `hubble observe` command. Each line then also shows the node name, for example
+> `kind-kind/kind-worker2`.
 
 **Traffic leaving the cluster.** Call a site on the internet, then filter on `world`, the
 identity Cilium gives to everything outside the cluster:
@@ -35,8 +39,9 @@ hubble observe --pod default/netshoot-client --to-label reserved:world --last 10
 where nothing listens:
 
 ```bash
+NGINX_IP=$(kubectl get pod -l app.kubernetes.io/name=nginx -o jsonpath='{.items[0].status.podIP}')
 kubectl exec pod/netshoot-client -- curl -s -m 3 http://$NGINX_IP:8081
-hubble observe --pod default/netshoot-client --port 8081 --last 10
+hubble observe --port 8081 --last 10
 ```
 
 `curl` fails with `exit code 7`. In Hubble:
@@ -47,5 +52,6 @@ hubble observe --pod default/netshoot-client --port 8081 --last 10
 This is an application or configuration problem, not a network one. A policy drop would
 look different: a `DROPPED` verdict and no reply.
 
-> **Note:** If `$NGINX_IP` is empty (for example in a new terminal), set it again with the
-> first command of step 3.
+> **Note:** `--pod` and `--port` together match only when the pod **and** the port are on
+> the same side of the flow. The client uses a random port and nginx owns port 8081, so
+> `--pod default/netshoot-client --port 8081` shows nothing. Filter on the port alone.

@@ -195,25 +195,31 @@ $ kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" h
 200
 ```
 
-One `curl` gives a full TCP conversation:
+One `curl` gives a full TCP conversation (names, ports and IDs differ in your cluster):
 
 ```
-Oct  9 10:12:01.104: default/netshoot-client:51522 (ID:28634) -> default/nginx-deployment-979f5455f-tjd2w:80 (ID:4512) to-overlay FORWARDED (TCP Flags: SYN)
-Oct  9 10:12:01.105: default/netshoot-client:51522 (ID:28634) -> default/nginx-deployment-979f5455f-tjd2w:80 (ID:4512) to-endpoint FORWARDED (TCP Flags: SYN)
-Oct  9 10:12:01.105: default/netshoot-client:51522 (ID:28634) <- default/nginx-deployment-979f5455f-tjd2w:80 (ID:4512) to-overlay FORWARDED (TCP Flags: SYN, ACK)
-Oct  9 10:12:01.106: default/netshoot-client:51522 (ID:28634) -> default/nginx-deployment-979f5455f-tjd2w:80 (ID:4512) to-overlay FORWARDED (TCP Flags: ACK)
-Oct  9 10:12:01.106: default/netshoot-client:51522 (ID:28634) -> default/nginx-deployment-979f5455f-tjd2w:80 (ID:4512) to-overlay FORWARDED (TCP Flags: ACK, PSH)
-Oct  9 10:12:01.107: default/netshoot-client:51522 (ID:28634) <- default/nginx-deployment-979f5455f-tjd2w:80 (ID:4512) to-overlay FORWARDED (TCP Flags: ACK, PSH)
-Oct  9 10:12:01.108: default/netshoot-client:51522 (ID:28634) -> default/nginx-deployment-979f5455f-tjd2w:80 (ID:4512) to-overlay FORWARDED (TCP Flags: ACK, FIN)
-[OUTPUT TRUNCATED]
+Oct 12 21:53:59.286: default/netshoot-client:38958 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: SYN)
+Oct 12 21:53:59.286: default/netshoot-client:38958 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: SYN)
+Oct 12 21:53:59.286: default/netshoot-client:38958 (ID:48603) <- default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: SYN, ACK)
+Oct 12 21:53:59.286: default/netshoot-client:38958 (ID:48603) <- default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: SYN, ACK)
+Oct 12 21:53:59.286: default/netshoot-client:38958 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: ACK)
+Oct 12 21:53:59.286: default/netshoot-client:38958 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: ACK)
+Oct 12 21:53:59.286: default/netshoot-client:38958 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: ACK, PSH)
+Oct 12 21:53:59.286: default/netshoot-client:38958 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: ACK, PSH)
+Oct 12 21:53:59.287: default/netshoot-client:38958 (ID:48603) <- default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: ACK, PSH)
+Oct 12 21:53:59.287: default/netshoot-client:38958 (ID:48603) <- default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: ACK, PSH)
+Oct 12 21:53:59.287: default/netshoot-client:38958 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: ACK, FIN)
+Oct 12 21:53:59.287: default/netshoot-client:38958 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: ACK, FIN)
+Oct 12 21:53:59.287: default/netshoot-client:38958 (ID:48603) <- default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: ACK, FIN)
+Oct 12 21:53:59.287: default/netshoot-client:38958 (ID:48603) <- default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: ACK, FIN)
 ```
 
 How to read a flow:
 
 | Part | Meaning |
 | --- | --- |
-| `default/netshoot-client:51522` | namespace/pod and port. Hubble shows names, not only IPs |
-| `(ID:28634)` | the Cilium **security identity** of the pod, derived from its labels |
+| `default/netshoot-client:38958` | namespace/pod and port. Hubble shows names, not only IPs |
+| `(ID:48603)` | the Cilium **security identity** of the pod, derived from its labels |
 | `->` / `<-` | request direction / reply direction |
 | `to-overlay` | the packet left the node through the VXLAN tunnel (the pods are on different nodes) |
 | `to-endpoint` | the packet was delivered to the destination pod |
@@ -237,21 +243,45 @@ $ kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" h
 200
 ```
 
-Two new things show up before the TCP flows.
-
-**1. A DNS lookup.** The client first asks CoreDNS for `nginx-service`:
+The new flows look like this:
 
 ```
-Oct  9 10:14:22.310: default/netshoot-client:40312 (ID:28634) -> kube-system/coredns-668d6bf9bc-x8nvk:53 (ID:31187) to-overlay FORWARDED (UDP)
-Oct  9 10:14:22.311: default/netshoot-client:40312 (ID:28634) <- kube-system/coredns-668d6bf9bc-x8nvk:53 (ID:31187) to-endpoint FORWARDED (UDP)
+Oct 12 21:58:27.585: default/netshoot-client:52192 (ID:48603) -> kube-system/coredns-559f6c778d-shp78:53 (ID:17890) to-endpoint FORWARDED (UDP)
+Oct 12 21:58:27.588: default/netshoot-client:52192 (ID:48603) <- kube-system/coredns-559f6c778d-shp78:53 (ID:17890) to-endpoint FORWARDED (UDP)
+Oct 12 21:58:27.839: default/netshoot-client:41963 (ID:48603) -> kube-system/coredns-559f6c778d-tpm7h:53 (ID:17890) to-endpoint FORWARDED (UDP)
+Oct 12 21:58:27.840: default/netshoot-client:39002 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: SYN)
+Oct 12 21:58:27.840: default/netshoot-client:39002 (ID:48603) <- default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: SYN, ACK)
+Oct 12 21:58:27.840: default/netshoot-client:39002 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: ACK)
+Oct 12 21:58:27.840: default/netshoot-client:39002 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: SYN)
+Oct 12 21:58:27.840: default/netshoot-client:39002 (ID:48603) <- default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: SYN, ACK)
+Oct 12 21:58:27.840: default/netshoot-client:39002 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: ACK)
+Oct 12 21:58:27.840: default/netshoot-client:39002 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: ACK, PSH)
+Oct 12 21:58:27.840: default/netshoot-client:39002 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: ACK, PSH)
+Oct 12 21:58:27.842: default/netshoot-client:39002 (ID:48603) <- default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: ACK, PSH)
+Oct 12 21:58:27.842: default/netshoot-client:39002 (ID:48603) <- default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: ACK, PSH)
+Oct 12 21:58:27.842: default/netshoot-client:39002 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: ACK, FIN)
+Oct 12 21:58:27.842: default/netshoot-client:39002 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: ACK, FIN)
+Oct 12 21:58:27.843: default/netshoot-client:39002 (ID:48603) <- default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: ACK, FIN)
+Oct 12 21:58:27.843: default/netshoot-client:39002 (ID:48603) <- default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: ACK, FIN)
+Oct 12 21:58:27.843: default/netshoot-client:39002 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: ACK)
+Oct 12 21:58:28.627: default/netshoot-client:41963 (ID:48603) <- kube-system/coredns-559f6c778d-tpm7h:53 (ID:17890) to-endpoint FORWARDED (UDP)
+Oct 12 21:58:28.628: default/netshoot-client (ID:48603) -> 10.96.0.10 (world) to-stack FORWARDED (ICMPv4 DestinationUnreachable(Port))
 ```
 
-The client used the kube-dns Service IP (`10.96.0.10`), but the flow already shows the
-CoreDNS **pod**.
+Two things are new:
+
+**1. A DNS lookup.** The client first asks CoreDNS for the IP of `nginx-service` on port
+`53` (`UDP`). The client used the kube-dns Service IP (`10.96.0.10`), but the flows already
+show the CoreDNS **pods**.
 
 **2. The TCP flows go to the nginx pod, not to the ClusterIP.** As in scenario 3, Cilium
 translates the ClusterIP to a backend pod IP in eBPF, before the packet leaves the client.
 So the flows look exactly like the pod-to-pod ones above.
+
+The last two lines are a late DNS reply: it arrives after `curl` has already closed its
+socket, so the client's kernel answers with an ICMP `DestinationUnreachable(Port)`. It is
+addressed to `10.96.0.10`, the ClusterIP of the `kube-dns` Service. A ClusterIP belongs to
+no pod and has no identity, so Hubble labels it `world`. It is harmless.
 
 To see which Service a flow went through, print it as JSON and look at
 `destination_service`:
@@ -277,7 +307,7 @@ $ hubble observe --to-pod default/nginx-deployment --last 20
 $ hubble observe --port 53 --last 20
 
 # Only what happens on one node
-$ hubble observe --node kind-worker2 --last 20
+$ hubble observe --node-name kind-worker2 --last 20
 
 # Only one namespace
 $ hubble observe --namespace default --last 20
@@ -285,6 +315,10 @@ $ hubble observe --namespace default --last 20
 
 > **Note:** `--to-pod default/nginx-deployment` matches every pod whose name **starts
 > with** `nginx-deployment`, so you don't need the random suffix.
+
+> **Note:** To see which node recorded each flow, add `--print-node-name` to any
+> `hubble observe` command. Each line then also shows the node name, for example
+> `kind-kind/kind-worker2`.
 
 ### Traffic leaving the cluster
 
@@ -319,7 +353,7 @@ command terminated with exit code 7
 ```
 
 ```bash
-$ hubble observe --pod default/netshoot-client --port 8081 --last 10
+$ hubble observe --port 8081 --last 10
 Oct  9 10:20:05.712: default/netshoot-client:58214 (ID:28634) -> default/nginx-deployment-979f5455f-tjd2w:8081 (ID:4512) to-overlay FORWARDED (TCP Flags: SYN)
 Oct  9 10:20:05.713: default/netshoot-client:58214 (ID:28634) <- default/nginx-deployment-979f5455f-tjd2w:8081 (ID:4512) to-overlay FORWARDED (TCP Flags: ACK, RST)
 ```
