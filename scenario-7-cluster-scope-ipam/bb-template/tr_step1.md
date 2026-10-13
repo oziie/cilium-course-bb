@@ -1,24 +1,24 @@
-### Cluster Scope IPAM (Küme Kapsamlı IP Yönetimi)
+### Cluster Scope IPAM (Cluster Kapsamlı IP Yönetimi)
 
-#### Adım 1 — Kümeyi Cluster Scope IPAM ile Oluşturun
+#### Adım 1 — Cluster Scope IPAM Mode ile Cluster Oluşturun
 
 **IPAM** (IP Address Management), her podun hangi IP adresini alacağına karar verir.
 **Cluster Scope** modunda (`ipam.mode=cluster-pool`) her düğüme pod adres aralığını
-(PodCIDR) **Kubernetes değil, Cilium** verir. Cilium operator, küme genelindeki bir veya
+(PodCIDR) **Kubernetes değil, Cilium** verir. Cilium operator, cluster genelindeki bir veya
 daha fazla havuzu düğüm başına alt ağlara böler. Kubernetes'te özel bir yapılandırma
-gerektirmediği için Cilium'un **varsayılan** IPAM modudur. Avantajı, kümenin tek bir
+gerektirmediği için Cilium'un **varsayılan** IPAM modudur. Avantajı, clusterın tek bir
 havuz yerine **birden fazla** havuza sahip olabilmesidir. Ancak havuzlar çok küçükse
 podların adresleri yine tükenir. Bu senaryo tam olarak bunu canlandırır.
 
-**Önce önceki kümeyi silin (zorunlu).** IPAM modu Cilium kurulurken belirlenir ve
-**çalışan bir kümede değiştirilemez**. Önceki bir senaryodan kalan bir küme varsa
+**Önce önceki clusterı silin (zorunlu).** IPAM modu Cilium kurulurken belirlenir ve
+**çalışan bir cluster değiştirilemez**. Önceki bir senaryodan kalan bir cluster varsa
 `ipam.mode=kubernetes` kullanır; bu yüzden onu silin:
 
 ```bash
 kind delete cluster --name kind
 ```
 
-Kümeyi oluşturun:
+Cluster ı oluşturun:
 
 ```bash
 cat > light-lab.yaml <<EOF
@@ -52,7 +52,7 @@ ipam:
 EOF
 ```
 
-- `clusterPoolIPv4PodCIDRList`: tüm küme için iki küçük `/28` havuz (her biri 16 adres).
+- `clusterPoolIPv4PodCIDRList`: tüm cluster için iki küçük `/28` havuz (her biri 16 adres).
 - `clusterPoolIPv4MaskSize: 29`: her düğüm, havuzlardan birinden bir `/29` (8 adres)
   alır.
 

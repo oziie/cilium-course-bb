@@ -1,2 +1,2 @@
-### Cluster Scope IPAM (Küme Kapsamlı IP Yönetimi)
+### Cluster Scope IPAM (Cluster Kapsamlı IP Yönetimi)
 Senaryo talimatlarını görmek için "Başla" butonuna tıklayın. 🚀

@@ -1,4 +1,4 @@
-### Cluster Scope IPAM (Küme Kapsamlı IP Yönetimi)
+### Cluster Scope IPAM (Cluster Kapsamlı IP Yönetimi)
 
 #### Adım 4 — Bir Düğümün Adreslerini Tüketin
 

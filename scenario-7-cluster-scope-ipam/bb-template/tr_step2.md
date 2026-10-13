@@ -1,4 +1,4 @@
-### Cluster Scope IPAM (Küme Kapsamlı IP Yönetimi)
+### Cluster Scope IPAM (Cluster Kapsamlı IP Yönetimi)
 
 #### Adım 2 — Her Düğümün Alt Ağını Kontrol Edin
 

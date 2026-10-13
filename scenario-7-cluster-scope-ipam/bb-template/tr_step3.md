@@ -1,4 +1,4 @@
-### Cluster Scope IPAM (Küme Kapsamlı IP Yönetimi)
+### Cluster Scope IPAM (Cluster Kapsamlı IP Yönetimi)
 
 #### Adım 3 — Örnek Bir Pod Dağıtın ve Düğümün Adreslerini Kontrol Edin
 
