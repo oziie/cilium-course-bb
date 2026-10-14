@@ -51,7 +51,8 @@ de aynı şeyi anlatır. Cilium'un atayacak IP'si kalmadığı için Kubernetes 
 oluşturamadı:
 
 ```bash
-kubectl describe pods -l app.kubernetes.io/name=nginx | grep -m 1 FailedCreatePodSandBox
+STUCK_POD=$(kubectl get pods -l app.kubernetes.io/name=nginx --field-selector status.phase=Pending -o name | head -n 1)
+kubectl describe $STUCK_POD | grep -m 1 "range is full"
 ```
 
 **Cluster Scope'un sınırları.** Kubernetes Host Scope'tan daha esnektir, ancak:

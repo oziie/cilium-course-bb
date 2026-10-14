@@ -50,7 +50,8 @@ pods tell the same story. Kubernetes could not create the pod's network because 
 had no IP left to allocate:
 
 ```bash
-kubectl describe pods -l app.kubernetes.io/name=nginx | grep -m 1 FailedCreatePodSandBox
+STUCK_POD=$(kubectl get pods -l app.kubernetes.io/name=nginx --field-selector status.phase=Pending -o name | head -n 1)
+kubectl describe $STUCK_POD | grep -m 1 "range is full"
 ```
 
 **Limitations of Cluster Scope.** It is more flexible than Kubernetes Host Scope, but:
