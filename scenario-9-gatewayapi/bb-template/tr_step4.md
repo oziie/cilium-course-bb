@@ -3,8 +3,12 @@
 #### Adım 4 — Ağırlık ve Header ile Canary Yayını
 
 Bookinfo, `reviews` servisinin üç sürümünü (`v1`, `v2`, `v3`) tek bir `reviews`
-Service'inin arkasında çalıştırır. Her sürüme trafiğin belirli bir payını göndermek
-için her sürüme, podların `version` etiketiyle seçilen kendi Service'ini verin:
+Service'inin arkasında çalıştırır. Bu adım yalnızca `v1` (mevcut sürüm) ve `v2` (canary)
+sürümlerini kullanır, bu yüzden yalnızca bu ikisi için Service oluşturur. `v3` podları
+çalışmaya devam eder, ancak aşağıdaki route onlara hiç trafik göndermez.
+
+Her sürüme trafiğin belirli bir payını göndermek için her sürüme, podların `version`
+etiketiyle seçilen kendi Service'ini verin:
 
 ```bash
 kubectl apply -f - <<EOF

@@ -36,7 +36,7 @@ EOF
 
 - `parentRefs`, route'u `my-gateway`'e bağlar.
 - `backendRefs`, doğrudan Service'leri ve portları gösterir.
-- Birden fazla kural eşleştiğinde **en özel** olan kazanır; bu yüzden `/` da eşleşse
+- Birden fazla kural eşleştiğinde **en detaylı belirtilen** kazanır; bu yüzden `/` da eşleşse
   `/details/1` isteği `details`'e gider. Kuralların sırası önemli değildir.
 
 Gateway'in route'u kabul ettiğini kontrol edin:
@@ -49,6 +49,10 @@ kubectl get httproute bookinfo -o jsonpath='{.status.parents[0].conditions[?(@.t
 
 **Uygulamayı kümenin dışından çağırın.** `GATEWAY_IP` boşsa, 2. adımdaki
 `GATEWAY_IP=...` komutuyla tekrar ayarlayın.
+
+```bash
+echo $GATEWAY_IP
+```
 
 `/` isteği `productpage`'e gider ve `200` HTTP kodunu döndürür:
 

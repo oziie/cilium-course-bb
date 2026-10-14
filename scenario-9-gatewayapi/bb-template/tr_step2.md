@@ -13,9 +13,9 @@ kubectl wait --for=condition=Ready pod --all --timeout=300s
 ```
 
 Bir `Gateway` bir `LoadBalancer` Service'i alır; bu yüzden tıpkı Senaryo 8'deki Ingress
-gibi harici bir IP'ye ihtiyaç duyar: `kind` Docker ağının içinde bir LB-IPAM havuzu ve
+gibi harici bir IP'ye ihtiyaç duyar. Bu sebeple yine aynı şekilde `kind` Docker ağının içinde bir LB-IPAM havuzu ve
 bir worker'ın bu IP için ARP isteklerine cevap vermesini sağlayan bir L2 duyuru
-politikası. Alt ağı kontrol edin:
+politikası oluşturun. Alt ağı kontrol edin:
 
 ```bash
 docker network inspect kind | grep Subnet

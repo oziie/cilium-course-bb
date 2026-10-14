@@ -50,6 +50,10 @@ It prints `True`.
 **Call the application from outside the cluster.** If `GATEWAY_IP` is empty, set it
 again with the `GATEWAY_IP=...` command of step 2.
 
+```bash
+echo $INGRESS_IP
+```
+
 `/` goes to `productpage` and returns HTTP code `200`:
 
 ```bash

@@ -255,8 +255,11 @@ $ curl --fail -s "http://$GATEWAY_IP/details/1"
 ## Canary Rollout with Weights and Headers
 
 Bookinfo runs three versions of the `reviews` service (`v1`, `v2`, `v3`) behind a single
-`reviews` Service. To send a chosen share of traffic to each version, give each version
-its own Service. [`reviews-services.yaml`](reviews-services.yaml) creates `reviews-v1`
+`reviews` Service. This section uses only `v1` (the current version) and `v2` (the
+canary), so it creates Services for those two. The `v3` pods keep running, but the route
+below never sends traffic to them.
+
+To send a chosen share of traffic to each version, give each version its own Service. [`reviews-services.yaml`](reviews-services.yaml) creates `reviews-v1`
 and `reviews-v2`, selecting pods by their `version` label:
 
 ```bash
