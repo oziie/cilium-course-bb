@@ -8,7 +8,11 @@ Deploy a pod on `kind-worker`:
 kubectl run netshoot-client --image=nicolaka/netshoot \
   --overrides='{"spec":{"nodeSelector":{"kubernetes.io/hostname":"kind-worker"}}}' \
   -- sleep infinity
+```
+```bash
 kubectl wait --for=condition=Ready pod/netshoot-client --timeout=120s
+```
+```bash
 kubectl get pod netshoot-client -o wide
 ```
 

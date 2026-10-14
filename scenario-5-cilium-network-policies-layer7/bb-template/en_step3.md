@@ -58,19 +58,24 @@ Test it:
 ```bash
 # Allowed: GET /api/products
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/api/products
-
+```
+```bash
 # Allowed: POST /api/orders
 kubectl exec -n frontend web -- curl -s --max-time 3 -X POST http://api.backend:8080/api/orders
-
+```
+```bash
 # Access denied: path /admin is not in the rules
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/admin
-
+```
+```bash
 # Access denied: DELETE without the header
 kubectl exec -n frontend web -- curl -s --max-time 3 -X DELETE http://api.backend:8080/api/orders/42
-
+```
+```bash
 # Allowed: DELETE with the header
 kubectl exec -n frontend web -- curl -s --max-time 3 -X DELETE -H 'X-Team: ops' http://api.backend:8080/api/orders/42
-
+```
+```bash
 # Timeout (exit code 28): the intruder fails the L3 check, before Envoy
 kubectl exec -n default intruder -- curl -s --max-time 3 http://api.backend:8080/api/products
 ```

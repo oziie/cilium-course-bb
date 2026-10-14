@@ -8,10 +8,12 @@ is noisy. A few filters answer most questions:
 ```bash
 # Who is calling nginx?
 hubble observe --to-pod default/nginx-deployment --last 10
-
+```
+```bash
 # All DNS traffic in the cluster
 hubble observe --port 53 --last 10
-
+```
+```bash
 # Only what happens on one node
 hubble observe --node-name kind-worker2 --last 10
 ```
@@ -28,6 +30,8 @@ identity Cilium gives to everything outside the cluster:
 
 ```bash
 kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" https://example.com
+```
+```bash
 hubble observe --pod default/netshoot-client --to-label reserved:world --last 10
 ```
 
@@ -41,6 +45,8 @@ where nothing listens:
 ```bash
 NGINX_IP=$(kubectl get pod -l app.kubernetes.io/name=nginx -o jsonpath='{.items[0].status.podIP}')
 kubectl exec pod/netshoot-client -- curl -s -m 3 http://$NGINX_IP:8081
+```
+```bash
 hubble observe --port 8081 --last 10
 ```
 

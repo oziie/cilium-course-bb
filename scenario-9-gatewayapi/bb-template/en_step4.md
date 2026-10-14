@@ -98,6 +98,8 @@ kubectl patch httproute reviews --type=json -p '[
   {"op": "replace", "path": "/spec/rules/1/backendRefs/0/weight", "value": 0},
   {"op": "replace", "path": "/spec/rules/1/backendRefs/1/weight", "value": 100}
 ]'
+```
+```bash
 for i in $(seq 1 50); do curl -s "http://$GATEWAY_IP/reviews/0" | grep -o 'reviews-v[0-9]'; done | sort | uniq -c
 ```
 

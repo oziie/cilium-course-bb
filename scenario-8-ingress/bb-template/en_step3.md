@@ -32,6 +32,8 @@ The Service gets an IP from the pool right away:
 
 ```bash
 kubectl get svc cilium-ingress-basic-ingress
+```
+```bash
 kubectl get ingress basic-ingress
 ```
 

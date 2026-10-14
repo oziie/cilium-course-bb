@@ -40,6 +40,8 @@ nodes:
 networking:
   disableDefaultCNI: true
 EOF
+```
+```bash
 kind create cluster --config light-lab.yaml
 ```
 
@@ -47,6 +49,8 @@ Cilium'u Helm ile kurun:
 
 ```bash
 helm repo add cilium https://helm.cilium.io/
+```
+```bash
 helm install cilium cilium/cilium -n kube-system \
   --version 1.18.4 \
   --set cluster.name=kind-kind \
@@ -60,6 +64,8 @@ Cilium hazır olana kadar bekleyin:
 
 ```bash
 cilium status --wait
+```
+```bash
 kubectl get nodes
 ```
 

@@ -35,6 +35,8 @@ Check the nodes and the pods:
 
 ```bash
 kubectl get nodes
+```
+```bash
 kubectl get pods -A
 ```
 

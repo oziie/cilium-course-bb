@@ -69,7 +69,11 @@ Wait for the pods, then look at the Service and the pods:
 
 ```bash
 kubectl wait --for=condition=Ready pod --all --timeout=120s
+```
+```bash
 kubectl get service nginx-service
+```
+```bash
 kubectl get pods -o wide
 ```
 

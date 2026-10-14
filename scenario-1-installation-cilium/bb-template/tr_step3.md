@@ -24,6 +24,8 @@ Bileşenleri kubectl ile kontrol edin:
 
 ```bash
 kubectl get -n kube-system daemonset cilium cilium-envoy
+```
+```bash
 kubectl get -n kube-system deployment cilium-operator
 ```
 
@@ -34,6 +36,8 @@ Artık bir CNI kurulu olduğu için cluster normal çalışır:
 
 ```bash
 kubectl get nodes
+```
+```bash
 kubectl get pods -A
 ```
 

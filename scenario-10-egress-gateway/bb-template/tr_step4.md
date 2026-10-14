@@ -20,7 +20,11 @@ uygulamayı daha fazla pod'a ölçeklerseniz map de onunla birlikte büyür.
 
 ```bash
 kubectl label node kind-worker2 egress-gateway-
+```
+```bash
 kubectl exec payments -- curl -s --max-time 5 http://$EXTERNAL_IP | grep RemoteAddr
+```
+```bash
 kubectl exec catalog -- curl -s --max-time 5 http://$EXTERNAL_IP | grep RemoteAddr
 ```
 
@@ -33,6 +37,8 @@ Etiketi geri ekleyin; `payments` yeniden `kind-worker2` üzerinden çıkar:
 
 ```bash
 kubectl label node kind-worker2 egress-gateway=true
+```
+```bash
 kubectl exec payments -- curl -s http://$EXTERNAL_IP | grep RemoteAddr
 ```
 

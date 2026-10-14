@@ -32,7 +32,8 @@ Call the API by name, then by its Service IP:
 
 ```bash
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080 && echo ALLOWED || echo BLOCKED
-
+```
+```bash
 API_IP=$(kubectl get svc api -n backend -o jsonpath='{.spec.clusterIP}')
 kubectl exec -n frontend web -- curl -s --max-time 3 http://$API_IP:8080 && echo ALLOWED || echo BLOCKED
 ```
@@ -76,7 +77,8 @@ spec:
             - port: "53"
               protocol: TCP
 EOF
-
+```
+```bash
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080 && echo ALLOWED || echo BLOCKED
 ```
 

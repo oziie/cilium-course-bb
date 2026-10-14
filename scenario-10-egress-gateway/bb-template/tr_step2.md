@@ -12,6 +12,8 @@ partnerin sunucusu gibi:
 
 ```bash
 docker run -d --name external-server --network kind traefik/whoami
+```
+```bash
 EXTERNAL_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' external-server)
 echo $EXTERNAL_IP
 ```
@@ -59,7 +61,11 @@ spec:
       image: nicolaka/netshoot
       command: ["sleep", "infinity"]
 EOF
+```
+```bash
 kubectl wait --for=condition=Ready pod/payments pod/catalog --timeout=120s
+```
+```bash
 kubectl get pods -o wide
 ```
 
@@ -67,6 +73,8 @@ Harici sunucuyu iki pod'dan da çağırın:
 
 ```bash
 kubectl exec payments -- curl -s http://$EXTERNAL_IP | grep RemoteAddr
+```
+```bash
 kubectl exec catalog -- curl -s http://$EXTERNAL_IP | grep RemoteAddr
 ```
 

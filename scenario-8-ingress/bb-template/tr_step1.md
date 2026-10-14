@@ -27,6 +27,8 @@ networking:
   disableDefaultCNI: true
   kubeProxyMode: none
 EOF
+```
+```bash
 kind create cluster --config light-lab.yaml
 ```
 
@@ -59,12 +61,16 @@ Cilium'u kurun ve hazır olana kadar bekleyin:
 
 ```bash
 helm repo add cilium https://helm.cilium.io/
+```
+```bash
 helm install cilium cilium/cilium -n kube-system \
   --version 1.18.4 \
   --set cluster.name=kind-kind \
   --set k8sServiceHost=kind-control-plane \
   --set k8sServicePort=6443 \
   -f cilium-values.yaml
+```
+```bash
 cilium status --wait
 ```
 
@@ -76,6 +82,8 @@ Ayarları ve IngressClass'ı kontrol edin:
 
 ```bash
 cilium config view | grep -E 'kube-proxy-replacement|enable-l2-announcements|enable-ingress-controller'
+```
+```bash
 kubectl get ingressclass
 ```
 

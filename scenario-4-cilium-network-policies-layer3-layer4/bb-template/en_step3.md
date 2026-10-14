@@ -37,7 +37,11 @@ Test it:
 
 ```bash
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080 && echo ALLOWED || echo BLOCKED
+```
+```bash
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:9090 && echo ALLOWED || echo BLOCKED
+```
+```bash
 kubectl exec -n default intruder -- curl -s --max-time 3 http://api.backend:8080 && echo ALLOWED || echo BLOCKED
 ```
 
@@ -76,6 +80,8 @@ Test it. The API sends a Redis `PING`, and the frontend tries to reach Redis dir
 
 ```bash
 kubectl exec -n backend deploy/api -- sh -c "printf 'PING\r\n' | nc -w 3 redis.database 6379"
+```
+```bash
 kubectl exec -n frontend web -- nc -z -w 3 redis.database 6379 && echo ALLOWED || echo BLOCKED
 ```
 

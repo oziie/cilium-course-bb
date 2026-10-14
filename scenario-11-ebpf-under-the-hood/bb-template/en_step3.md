@@ -36,7 +36,11 @@ Scale the Deployment and look again:
 
 ```bash
 kubectl scale deployment nginx --replicas=4
+```
+```bash
 kubectl wait --for=condition=Ready pod -l app=nginx --timeout=120s
+```
+```bash
 kubectl -n kube-system exec $AGENT1 -c cilium-agent -- cilium-dbg bpf lb list | grep $NGINX_IP
 ```
 

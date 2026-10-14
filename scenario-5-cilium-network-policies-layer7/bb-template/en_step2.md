@@ -17,8 +17,11 @@ Two client pods call it: `web` in `frontend` (the shop frontend) and `intruder` 
 
 ```bash
 kubectl create namespace frontend
+```
+```bash
 kubectl create namespace backend
-
+```
+```bash
 kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: ConfigMap
@@ -54,9 +57,14 @@ spec:
   selector: {app.kubernetes.io/name: api}
   ports: [{port: 8080}]
 EOF
-
+```
+```bash
 kubectl run web -n frontend --image=nicolaka/netshoot -l app.kubernetes.io/name=web -- sleep infinity
+```
+```bash
 kubectl run intruder -n default --image=nicolaka/netshoot -l app.kubernetes.io/name=intruder -- sleep infinity
+```
+```bash
 kubectl wait --for=condition=Ready pod --all -A --timeout=180s
 ```
 
@@ -65,6 +73,8 @@ reading the admin page work:
 
 ```bash
 kubectl exec -n frontend web -- curl -s --max-time 3 -X DELETE http://api.backend:8080/api/orders/42
+```
+```bash
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/admin
 ```
 
@@ -84,7 +94,8 @@ spec:
   ingress:
     - {}
 EOF
-
+```
+```bash
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/api/products
 ```
 

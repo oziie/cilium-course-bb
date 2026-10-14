@@ -30,6 +30,8 @@ spec:
       matchLabels:
         egress-gateway: "true"
 EOF
+```
+```bash
 kubectl get ciliumegressgatewaypolicies
 ```
 
@@ -45,6 +47,8 @@ Call the server again from both pods:
 
 ```bash
 kubectl exec payments -- curl -s http://$EXTERNAL_IP | grep RemoteAddr
+```
+```bash
 kubectl exec catalog -- curl -s http://$EXTERNAL_IP | grep RemoteAddr
 ```
 

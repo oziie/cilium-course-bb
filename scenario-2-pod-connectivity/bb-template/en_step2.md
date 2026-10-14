@@ -50,6 +50,8 @@ Wait until both pods are running, then show where they run:
 
 ```bash
 kubectl wait --for=condition=Ready pod --all --timeout=120s
+```
+```bash
 kubectl get pods -o wide
 ```
 

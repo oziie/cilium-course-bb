@@ -19,7 +19,11 @@ helm upgrade cilium cilium/cilium -n kube-system \
   --version 1.18.4 \
   --reuse-values \
   --set hubble.relay.enabled=true
+```
+```bash
 kubectl -n kube-system rollout status deployment/hubble-relay
+```
+```bash
 cilium status
 ```
 
@@ -30,6 +34,8 @@ The `hubble` CLI connects to Relay on `localhost:4245`. Open a port-forward to R
 
 ```bash
 cilium hubble port-forward > /dev/null 2>&1 &
+```
+```bash
 sleep 3
 hubble status
 ```

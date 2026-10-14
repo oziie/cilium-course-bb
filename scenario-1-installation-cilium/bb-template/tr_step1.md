@@ -35,6 +35,8 @@ Düğümleri ve podları kontrol edin:
 
 ```bash
 kubectl get nodes
+```
+```bash
 kubectl get pods -A
 ```
 

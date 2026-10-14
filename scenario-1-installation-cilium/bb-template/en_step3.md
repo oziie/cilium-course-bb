@@ -23,6 +23,8 @@ Check them with kubectl:
 
 ```bash
 kubectl get -n kube-system daemonset cilium cilium-envoy
+```
+```bash
 kubectl get -n kube-system deployment cilium-operator
 ```
 
@@ -33,6 +35,8 @@ Now that a CNI is installed, the cluster works normally:
 
 ```bash
 kubectl get nodes
+```
+```bash
 kubectl get pods -A
 ```
 

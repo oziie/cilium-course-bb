@@ -63,10 +63,12 @@ Test edin:
 ```bash
 # İzin verilir: HTTP/2 200 ve cevap header'ları
 kubectl exec -n frontend web -- curl -sI --max-time 5 https://api.github.com
-
+```
+```bash
 # Zaman aşımı (exit code 28): diğer tüm siteler engellenir
 kubectl exec -n frontend web -- curl -sI --max-time 5 https://example.com
-
+```
+```bash
 # İzin verilir: API hâlâ çalışır
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/api/products
 ```

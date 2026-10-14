@@ -15,9 +15,14 @@ Namespace'leri ve uygulamaları oluşturun:
 
 ```bash
 kubectl create namespace frontend
+```
+```bash
 kubectl create namespace backend
+```
+```bash
 kubectl create namespace database
-
+```
+```bash
 kubectl apply -f - <<EOF
 apiVersion: v1
 kind: ConfigMap
@@ -65,9 +70,14 @@ spec:
   selector: {app.kubernetes.io/name: redis}
   ports: [{port: 6379}]
 EOF
-
+```
+```bash
 kubectl run web -n frontend --image=nicolaka/netshoot -l app.kubernetes.io/name=web -- sleep infinity
+```
+```bash
 kubectl run intruder -n default --image=nicolaka/netshoot -l app.kubernetes.io/name=intruder -- sleep infinity
+```
+```bash
 kubectl wait --for=condition=Ready pod --all -A --timeout=180s
 ```
 
@@ -77,7 +87,11 @@ sessizce düşürülür, bu yüzden komutlar 3 saniye sonra denemeyi bırakır:
 
 ```bash
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080 && echo ALLOWED || echo BLOCKED
+```
+```bash
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:9090 && echo ALLOWED || echo BLOCKED
+```
+```bash
 kubectl exec -n default intruder -- nc -z -w 3 redis.database 6379 && echo ALLOWED || echo BLOCKED
 ```
 

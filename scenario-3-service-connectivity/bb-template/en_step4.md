@@ -7,8 +7,14 @@ creates a new one:
 
 ```bash
 kubectl get pods -l app.kubernetes.io/name=nginx -o wide
+```
+```bash
 kubectl delete pod -l app.kubernetes.io/name=nginx
+```
+```bash
 kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=nginx --timeout=60s
+```
+```bash
 kubectl get pods -l app.kubernetes.io/name=nginx -o wide
 ```
 

@@ -20,7 +20,11 @@ Now remove the label, so **no node** matches the policy any more:
 
 ```bash
 kubectl label node kind-worker2 egress-gateway-
+```
+```bash
 kubectl exec payments -- curl -s --max-time 5 http://$EXTERNAL_IP | grep RemoteAddr
+```
+```bash
 kubectl exec catalog -- curl -s --max-time 5 http://$EXTERNAL_IP | grep RemoteAddr
 ```
 
@@ -33,6 +37,8 @@ Put the label back, and `payments` leaves through `kind-worker2` again:
 
 ```bash
 kubectl label node kind-worker2 egress-gateway=true
+```
+```bash
 kubectl exec payments -- curl -s http://$EXTERNAL_IP | grep RemoteAddr
 ```
 

@@ -8,10 +8,12 @@ kalabalıktır. Birkaç filtre çoğu soruyu cevaplar:
 ```bash
 # nginx'i kim çağırıyor?
 hubble observe --to-pod default/nginx-deployment --last 10
-
+```
+```bash
 # Clusterdaki tüm DNS trafiği
 hubble observe --port 53 --last 10
-
+```
+```bash
 # Yalnızca tek bir düğümde olanlar
 hubble observe --node-name kind-worker2 --last 10
 ```
@@ -28,6 +30,8 @@ dışındaki her şeye verdiği `world` kimliğine göre filtreleyin:
 
 ```bash
 kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" https://google.com
+```
+```bash
 hubble observe --pod default/netshoot-client --to-label reserved:world --last 10
 ```
 
@@ -41,6 +45,8 @@ dinlemediği 8081 portundan çağırın:
 ```bash
 NGINX_IP=$(kubectl get pod -l app.kubernetes.io/name=nginx -o jsonpath='{.items[0].status.podIP}')
 kubectl exec pod/netshoot-client -- curl -s -m 3 http://$NGINX_IP:8081
+```
+```bash
 hubble observe --port 8081 --last 10
 ```
 

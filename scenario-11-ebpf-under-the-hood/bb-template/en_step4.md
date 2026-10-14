@@ -63,8 +63,12 @@ no identity matches the policy. Give the client that label and check again:
 
 ```bash
 kubectl label pod client app=frontend --overwrite
+```
+```bash
 sleep 5
 kubectl -n kube-system exec $AGENT2 -c cilium-agent -- cilium-dbg bpf policy get $EP_ID
+```
+```bash
 kubectl exec client -- curl -s -o /dev/null -w "%{http_code}\n" http://nginx
 ```
 

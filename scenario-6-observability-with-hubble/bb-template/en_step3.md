@@ -7,6 +7,8 @@
 ```bash
 NGINX_IP=$(kubectl get pod -l app.kubernetes.io/name=nginx -o jsonpath='{.items[0].status.podIP}')
 kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" http://$NGINX_IP
+```
+```bash
 hubble observe --pod default/netshoot-client --last 10
 ```
 
@@ -49,6 +51,8 @@ on `kind-worker2` (`to-endpoint`). Each node records what it sees, and Relay mer
 
 ```bash
 kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" http://nginx-service
+```
+```bash
 hubble observe --pod default/netshoot-client --last 20
 ```
 

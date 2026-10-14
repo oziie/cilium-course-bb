@@ -53,8 +53,14 @@ spec:
       image: nicolaka/netshoot
       command: ["sleep", "infinity"]
 EOF
+```
+```bash
 kubectl wait --for=condition=Ready pod -l app=nginx --timeout=120s
+```
+```bash
 kubectl wait --for=condition=Ready pod/client --timeout=120s
+```
+```bash
 kubectl exec client -- curl -s -o /dev/null -w "%{http_code}\n" http://nginx
 ```
 
@@ -65,6 +71,8 @@ The Cilium agent image ships `bpftool`, the standard Linux tool for eBPF, and
 
 ```bash
 AGENT1=$(kubectl -n kube-system get pod -l k8s-app=cilium --field-selector spec.nodeName=kind-worker -o name)
+```
+```bash
 AGENT2=$(kubectl -n kube-system get pod -l k8s-app=cilium --field-selector spec.nodeName=kind-worker2 -o name)
 ```
 

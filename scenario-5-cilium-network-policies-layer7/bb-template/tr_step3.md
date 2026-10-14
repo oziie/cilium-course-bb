@@ -58,19 +58,24 @@ Test edin:
 ```bash
 # İzin verilir: GET /api/products
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/api/products
-
+```
+```bash
 # İzin verilir: POST /api/orders
 kubectl exec -n frontend web -- curl -s --max-time 3 -X POST http://api.backend:8080/api/orders
-
+```
+```bash
 # Access denied: /admin yolu kurallarda yok
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/admin
-
+```
+```bash
 # Access denied: header olmadan DELETE
 kubectl exec -n frontend web -- curl -s --max-time 3 -X DELETE http://api.backend:8080/api/orders/42
-
+```
+```bash
 # İzin verilir: header ile DELETE
 kubectl exec -n frontend web -- curl -s --max-time 3 -X DELETE -H 'X-Team: ops' http://api.backend:8080/api/orders/42
-
+```
+```bash
 # Zaman aşımı (exit code 28): intruder, Envoy'a ulaşmadan L3 kontrolüne takılır
 kubectl exec -n default intruder -- curl -s --max-time 3 http://api.backend:8080/api/products
 ```

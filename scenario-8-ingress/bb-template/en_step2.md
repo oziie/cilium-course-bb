@@ -8,7 +8,11 @@ from the Istio project: a `productpage` web page that calls the `details`, `revi
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/bookinfo/platform/kube/bookinfo.yaml
+```
+```bash
 kubectl wait --for=condition=Ready pod --all --timeout=300s
+```
+```bash
 kubectl get svc
 ```
 

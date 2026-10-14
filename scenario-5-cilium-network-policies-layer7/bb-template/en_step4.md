@@ -61,10 +61,12 @@ Test it:
 ```bash
 # Allowed: HTTP/2 200 and the response headers
 kubectl exec -n frontend web -- curl -sI --max-time 5 https://api.github.com
-
+```
+```bash
 # Timeout (exit code 28): any other site is blocked
 kubectl exec -n frontend web -- curl -sI --max-time 5 https://example.com
-
+```
+```bash
 # Allowed: the API still works
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/api/products
 ```

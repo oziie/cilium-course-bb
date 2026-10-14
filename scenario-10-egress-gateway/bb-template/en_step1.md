@@ -37,6 +37,8 @@ Delete any previous cluster, then create the new one:
 
 ```bash
 kind delete cluster --name kind
+```
+```bash
 cat > light-lab.yaml <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -48,6 +50,8 @@ networking:
   disableDefaultCNI: true
   kubeProxyMode: none
 EOF
+```
+```bash
 kind create cluster --config light-lab.yaml
 ```
 
@@ -77,12 +81,16 @@ Install Cilium and wait until it is ready:
 
 ```bash
 helm repo add cilium https://helm.cilium.io/
+```
+```bash
 helm install cilium cilium/cilium -n kube-system \
   --version 1.18.4 \
   --set cluster.name=kind-kind \
   --set k8sServiceHost=kind-control-plane \
   --set k8sServicePort=6443 \
   -f cilium-values.yaml
+```
+```bash
 cilium status --wait
 ```
 

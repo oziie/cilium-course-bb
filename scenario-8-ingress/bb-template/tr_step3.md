@@ -32,6 +32,8 @@ Service, havuzdan hemen bir IP alır:
 
 ```bash
 kubectl get svc cilium-ingress-basic-ingress
+```
+```bash
 kubectl get ingress basic-ingress
 ```
 

@@ -7,6 +7,8 @@ application as in Scenario 8:
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/bookinfo/platform/kube/bookinfo.yaml
+```
+```bash
 kubectl wait --for=condition=Ready pod --all --timeout=300s
 ```
 
@@ -72,6 +74,8 @@ gives it an IP:
 
 ```bash
 kubectl get gateway my-gateway
+```
+```bash
 kubectl get svc cilium-gateway-my-gateway
 ```
 

@@ -21,6 +21,8 @@ nodes:
 networking:
   disableDefaultCNI: true
 EOF
+```
+```bash
 kind create cluster --config light-lab.yaml
 ```
 
@@ -28,6 +30,8 @@ Cilium'u Helm ile kurun ve hazır olana kadar bekleyin:
 
 ```bash
 helm repo add cilium https://helm.cilium.io/
+```
+```bash
 helm install cilium cilium/cilium -n kube-system \
   --version 1.18.4 \
   --set cluster.name=kind-kind \
@@ -35,6 +39,8 @@ helm install cilium cilium/cilium -n kube-system \
   --set operator.replicas=1 \
   --set routingMode=tunnel \
   --set tunnelProtocol=vxlan
+```
+```bash
 cilium status --wait
 ```
 
@@ -84,8 +90,11 @@ spec:
   ports:
     - port: 80
 EOF
-
+```
+```bash
 kubectl wait --for=condition=Ready pod --all --timeout=120s
+```
+```bash
 kubectl get pods -o wide
 ```
 
