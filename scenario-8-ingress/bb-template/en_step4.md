@@ -42,8 +42,11 @@ kubectl -n kube-system get lease | grep l2announce
 
 If that node goes down, another worker takes over the lease and starts answering.
 
-**Call the application from outside the cluster.** If `INGRESS_IP` is empty, set it
-again with the last command of step 3.
+**Call the application from outside the cluster.** Check whether`INGRESS_IP` is empty with below command. If it's not set, run the last command of step 3 to set.
+
+```bash
+echo $INGRESS_IP
+```
 
 `/` goes to `productpage` and returns HTTP code `200`:
 
@@ -59,3 +62,21 @@ curl --fail -s "http://$INGRESS_IP/details/1"
 
 The request travelled: this machine → ARP answer from a worker → Cilium's Envoy on that
 node → the `details` or `productpage` pod, chosen by the path rules of the Ingress.
+
+```
+ this machine  (curl http://$INGRESS_IP/...)
+      |
+      |  1. ARP: "who has $INGRESS_IP?"
+      v
+ worker node holding the lease  (answers the ARP request)
+      |
+      |  2. HTTP request
+      v
+ Cilium's Envoy on that node
+      |
+      |  3. path rules of the Ingress
+      |
+      +-- /details/...           -->  details pod
+      |
+      +-- /  (everything else)   -->  productpage pod
+```

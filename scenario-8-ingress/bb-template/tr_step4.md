@@ -2,7 +2,7 @@
 
 #### Adım 4 — IP'yi Duyurun ve Uygulamayı Çağırın
 
-**Katman 2 duyurusu** (L2 announcement), düğümlerin Service IP'lerini yerel ağda ARP
+**Layer 2 duyurusu** (L2 announcement), düğümlerin Service IP'lerini yerel ağda ARP
 (IPv4) ile duyurmasını sağlar. Böylece aynı ağdaki makineler, örneğin kind'ı çalıştıran
 makine, ayrı bir load balancer olmadan bu IP'lere ulaşabilir. Hangi düğümlerin ve
 arayüzlerin bu IP'leri duyuracağını bir `CiliumL2AnnouncementPolicy` belirler.
@@ -42,8 +42,11 @@ kubectl -n kube-system get lease | grep l2announce
 
 O düğüm çökerse, başka bir worker lease'i devralır ve cevap vermeye başlar.
 
-**Uygulamayı kümenin dışından çağırın.** `INGRESS_IP` boşsa, 3. adımın son komutuyla
-tekrar ayarlayın.
+**Uygulamayı kümenin dışından çağırın.** `INGRESS_IP` değişkeni dolu mu kontrol edin. Eğer boşsa, 3.adımdaki son komutuyla tekrar ayarlayın.
+
+```bash
+echo $INGRESS_IP
+```
 
 `/` isteği `productpage`'e gider ve `200` HTTP kodunu döndürür:
 
@@ -60,3 +63,21 @@ curl --fail -s "http://$INGRESS_IP/details/1"
 
 İsteğin yolu: bu makine → bir worker'dan gelen ARP cevabı → o düğümdeki Cilium Envoy →
 Ingress'in yol kurallarına göre seçilen `details` veya `productpage` podu.
+
+```
+ bu makine  (curl http://$INGRESS_IP/...)
+      |
+      |  1. ARP: "$INGRESS_IP kimde?"
+      v
+ lease sahibi worker düğüm  (ARP isteğine cevap verir)
+      |
+      |  2. HTTP isteği
+      v
+ o düğümdeki Cilium Envoy
+      |
+      |  3. Ingress'in yol kuralları
+      |
+      +-- /details/...           -->  details podu
+      |
+      +-- /  (diğer her şey)     -->  productpage podu
+```
