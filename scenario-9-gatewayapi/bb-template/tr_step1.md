@@ -12,12 +12,9 @@ yola göre yönlendirme yapar; fazlası controller'a özel annotation'lar gerekt
 | `Gateway` | platform ekibi | bir giriş noktası: listener'lar, portlar, bir IP |
 | `HTTPRoute` | uygulama ekibi | yönlendirme kuralları: eşleşmeler, backend'ler, ağırlıklar |
 
-Senaryo 8'deki gibi bu senaryo da **kube-proxy olmayan** bir küme gerektirir. Önceki
-kümeyi silin, ardından yenisini oluşturun:
+Bu senaryo **kube-proxy olmayan** bir küme gerektirir: onun yerini Cilium alır. `kubeProxyMode: none`, kind'a kube-proxy
+kurmamasını söyler:
 
-```bash
-kind delete cluster --name kind
-```
 ```bash
 cat > light-lab.yaml <<EOF
 kind: Cluster

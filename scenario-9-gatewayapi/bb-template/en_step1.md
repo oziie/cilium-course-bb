@@ -12,8 +12,8 @@ successor, and it splits the job into resources owned by different roles:
 | `Gateway` | platform team | an entry point: listeners, ports, an IP |
 | `HTTPRoute` | application team | routing rules: matches, backends, weights |
 
-Like Scenario 8, this scenario needs a cluster **without kube-proxy**. Delete any
-previous cluster, then create the new one:
+This scenario needs a cluster **without kube-proxy**: Cilium replaces it.`kubeProxyMode: none` tells kind not to
+install kube-proxy:
 
 ```bash
 kind delete cluster --name kind
