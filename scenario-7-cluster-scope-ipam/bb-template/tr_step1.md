@@ -10,7 +10,7 @@ gerektirmediği için Cilium'un **varsayılan** IPAM modudur. Avantajı, cluster
 havuz yerine **birden fazla** havuza sahip olabilmesidir. Ancak havuzlar çok küçükse
 podların adresleri yine tükenir. Bu senaryo tam olarak bunu canlandırır.
 
-**Önce önceki clusterı silin (zorunlu).** IPAM modu Cilium kurulurken belirlenir ve
+**Eğer varsa, daha önce oluşturulmuş clusterı silin (zorunlu).** IPAM modu Cilium kurulurken belirlenir ve
 **çalışan bir cluster değiştirilemez**. Önceki bir senaryodan kalan bir cluster varsa
 `ipam.mode=kubernetes` kullanır; bu yüzden onu silin:
 

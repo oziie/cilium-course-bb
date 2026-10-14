@@ -64,10 +64,3 @@ kubectl describe $STUCK_POD | grep -m 1 "range is full"
   podlar aynı ortak havuzlardan adres alır.
 
 Multi-Pool IPAM modu bu kısıtlamaları ortadan kaldırır.
-
-**Kümeyi silin (zorunlu).** Bu küme, başka hiçbir senaryonun kullanmadığı
-`ipam.mode=cluster-pool` ayarını kullanır:
-
-```bash
-kind delete cluster --name kind
-```

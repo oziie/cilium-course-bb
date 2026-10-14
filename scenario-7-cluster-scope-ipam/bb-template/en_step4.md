@@ -62,10 +62,3 @@ kubectl describe $STUCK_POD | grep -m 1 "range is full"
   their workload or namespace.
 
 Multi-Pool IPAM mode removes these restrictions.
-
-**Delete the cluster (mandatory).** This cluster uses `ipam.mode=cluster-pool`, which no
-other scenario uses:
-
-```bash
-kind delete cluster --name kind
-```

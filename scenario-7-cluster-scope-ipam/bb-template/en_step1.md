@@ -10,7 +10,7 @@ special Kubernetes configuration. Its advantage is that the cluster can have **s
 pools instead of one. But if the pools are too small, pods still run out of addresses.
 This scenario simulates exactly that.
 
-**Delete any previous cluster first (mandatory).** The IPAM mode is set when Cilium is
+**If exists, delete any previous cluster first (mandatory).** The IPAM mode is set when Cilium is
 installed and **cannot be changed on a running cluster**. If a cluster from an earlier
 scenario exists, it uses `ipam.mode=kubernetes`, so delete it:
 
