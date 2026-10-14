@@ -20,6 +20,13 @@ ARG TARGETARCH=amd64
 # Bump these together. hubble-cli must match the Cilium minor the labs install
 # (1.18): a newer CLI fails against Cilium 1.18 with "invalid fieldmask".
 ARG KUBECTL_VERSION=v1.37.1
+# KIND_VERSION also decides the Kubernetes version of the lab clusters: the
+# scenarios set no node image, so kind uses its built-in default (v0.33.0 ->
+# kindest/node:v1.37.0). Bumping kind therefore upgrades Kubernetes too.
+# Platform and course owners own this choice: before a bump, check that the new
+# Kubernetes version stays within kubectl's +/-1 minor skew and is supported by
+# the Cilium version the labs install (Cilium 1.18 tests 1.30-1.33).
+# Yet, 1.37 works fine with Cilium version for the covered scenarios.
 ARG KIND_VERSION=v0.33.0
 ARG HELM_VERSION=v3.22.0
 ARG CILIUM_CLI_VERSION=v0.20.1
