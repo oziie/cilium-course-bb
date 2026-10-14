@@ -12,12 +12,10 @@ ile dışarıya açacak, ona harici bir IP verecek ve kümenin dışından `curl
 | LB-IPAM (`CiliumLoadBalancerIPPool`) | `LoadBalancer` Service'lerine, sizin tanımladığınız bir havuzdan harici IP verir |
 | L2 duyuruları (`CiliumL2AnnouncementPolicy`) | bir düğümün bu IP için gelen ARP isteklerine cevap vermesini sağlar; böylece kind'ı çalıştıran makine IP'ye ulaşabilir |
 
-Bu senaryo **kube-proxy olmayan** bir küme gerektirir: onun yerini Cilium alır. Önceki
-kümeyi silin, ardından yenisini oluşturun. `kubeProxyMode: none`, kind'a kube-proxy
+Bu senaryo **kube-proxy olmayan** bir küme gerektirir: onun yerini Cilium alır. `kubeProxyMode: none`, kind'a kube-proxy
 kurmamasını söyler:
 
 ```bash
-kind delete cluster --name kind
 cat > light-lab.yaml <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
