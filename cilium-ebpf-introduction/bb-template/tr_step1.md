@@ -35,7 +35,7 @@ CNCF spesifikasyonudur: bir pod başladığında container runtime eklentiyi `AD
 komutuyla, pod silindiğinde ise `DEL` komutuyla çağırır. Gerisi tamamen eklentiye
 kalmıştır.
 
-![Bir pod başladığında CNI eklentisinin yaptıkları](https://raw.githubusercontent.com/oziie/cilium-course-bb/main/img/01-cni-overview.png)
+![Bir pod başladığında CNI eklentisinin yaptıkları](https://raw.githubusercontent.com/oziie/cilium-course-bb/main/img/01-cni-overview-tr.png)
 
 Çağrıldığında CNI eklentisi:
 
@@ -73,7 +73,7 @@ gelip gider ve IP'leri sürekli değişir. Ölçek büyüdükçe bu kendini gös
   tanımlamak için zayıf bir yoldur.
 - **Görünürlük** azdır: bir paketi hangi kuralın, neden düşürdüğünü anlamak zordur.
 
-![iptables zincirlerinden eBPF veri yoluna](https://raw.githubusercontent.com/oziie/cilium-course-bb/main/img/02-datapath-evolution.png)
+![iptables zincirlerinden eBPF veri yoluna](https://raw.githubusercontent.com/oziie/cilium-course-bb/main/img/02-datapath-evolution-tr.png)
 
 Modern veri yolları bu zincirleri **eBPF** programları ve hash tablosu aramalarıyla
 değiştirir; bu aramaların maliyeti kümede 10 Service de olsa 10.000 Service de olsa
@@ -94,7 +94,7 @@ Packet Filter**'dan (BPF) gelir. **Genişletilmiş** BPF (extended BPF, eBPF) 20
 Linux'a eklendi ve bu küçük filtreyi çekirdeğin içinde genel amaçlı bir motora
 dönüştürdü.
 
-![Bir eBPF programı çekirdeğe nasıl girer ve nasıl çalışır](https://raw.githubusercontent.com/oziie/cilium-course-bb/main/img/03-ebpf-how-it-works.png)
+![Bir eBPF programı çekirdeğe nasıl girer ve nasıl çalışır](https://raw.githubusercontent.com/oziie/cilium-course-bb/main/img/03-ebpf-how-it-works-tr.png)
 
 Temel yapı taşları:
 
@@ -135,7 +135,7 @@ seviyesindeki bir projesidir; bu, Kubernetes'in kendisiyle aynı olgunluk seviye
 
 ##### Nasıl Çalışır?
 
-![Cilium mimarisi](https://raw.githubusercontent.com/oziie/cilium-course-bb/main/img/04-cilium-architecture.png)
+![Cilium mimarisi](https://raw.githubusercontent.com/oziie/cilium-course-bb/main/img/04-cilium-architecture-tr.png)
 
 | Bileşen | Nasıl çalışır | Görevi |
 | --- | --- | --- |
@@ -180,7 +180,7 @@ programlar; işi çekirdek yapar.
 
 #### Cilium Kullanım Alanları
 
-![Cilium ne için kullanılır](https://raw.githubusercontent.com/oziie/cilium-course-bb/main/img/05-cilium-use-cases.png)
+![Cilium ne için kullanılır](https://raw.githubusercontent.com/oziie/cilium-course-bb/main/img/05-cilium-use-cases-tr.png)
 
 ##### Cilium'u Ne Zaman Seçmelisiniz?
 
