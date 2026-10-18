@@ -1,4 +1,9 @@
+# Scenario 1 — Installation of Cilium
+
 > **Note:** E-Book Chapter-3 and this repo is the reference for the installation part.
+
+**Scope:** Create a kind cluster without a CNI, install Cilium with Helm and verify the
+installation.
 
 ## Prerequisites Tools
 
@@ -6,12 +11,18 @@
 - `cilium-cli`
 - `hubble`
 
-## Create kind cluster (no need for BB)
-
 If you are building the lab on your own Ubuntu machine, follow
 [setup-ubuntu/instructions-setup-ubuntu.md](../setup-ubuntu/instructions-setup-ubuntu.md)
-first to install the prerequisite tools. Then create this scenario's cluster from
-[`light-lab.yaml`](light-lab.yaml):
+first to install them.
+
+## Step 1 — Create the kind Cluster
+
+In this scenario you install **Cilium** as the network plugin (CNI) of a Kubernetes
+cluster. First, create a local cluster with **kind** (Kubernetes in Docker): 1
+control-plane node and 2 worker nodes. Having two workers lets the later scenarios show
+traffic between pods on different nodes.
+
+The kind configuration is in [`light-lab.yaml`](light-lab.yaml):
 
 ```yaml
 kind: Cluster
@@ -21,111 +32,144 @@ nodes:
 - role: worker
 - role: worker
 networking:
-  disableDefaultCNI: true   # Disables kindnetd prior to Cilium install
+  disableDefaultCNI: true
 ```
 
-One control-plane node plus two workers gives two schedulable nodes, so later scenarios
-can show *internode* pod-to-pod traffic. `disableDefaultCNI: true` removes kindnetd so
-Cilium can own the data plane.
+`disableDefaultCNI: true` turns off **kindnetd**, the network plugin kind installs by
+default, so that Cilium can take over pod networking.
 
-Create it with the [`create-kind-cluster.sh`](create-kind-cluster.sh) script in this
-folder:
+Create the cluster (this takes a minute or two) with the
+[`create-kind-cluster.sh`](create-kind-cluster.sh) script in this folder:
 
 ```bash
 cd scenario-1-installation-cilium
 ./create-kind-cluster.sh --no-cilium
-kubectl config current-context   # should print kind-kind, matching cluster.name below
+kubectl config current-context   # should print kind-kind
 ```
 
-The script:
-
-- fails fast if Docker is unreachable or `docker`/`kind`/`kubectl` is missing
-- creates the cluster from `light-lab.yaml` (or reuses it if it already exists)
-- writes the `kind-kind` context to `$KUBECONFIG` (default `~/.kube/config`) and switches to it
-- waits for the API server and verifies the 1 control-plane + 2 worker layout
-
-`--no-cilium` stops there, because installing Cilium is what this scenario is about.
-Without the flag, the script also runs the Helm install below for you. That is how the
-later scenarios use it.
-
-Useful flags: `--recreate` to start fresh, `--image kindest/node:<tag>` to pin the
-Kubernetes version, `--delete` to remove the cluster. See `./create-kind-cluster.sh --help`.
+`--no-cilium` stops after creating the cluster, because installing Cilium is what this
+scenario is about. Without the flag, the script also runs the Helm install of step 2 for
+you; that is how the later scenarios use it. Other useful flags: `--recreate` to start
+fresh, `--image kindest/node:<tag>` to pin the Kubernetes version, `--delete` to remove
+the cluster. See `./create-kind-cluster.sh --help`.
 
 <details>
-<summary>Manual alternative</summary>
+<summary>Manual alternative (the commands used on BB)</summary>
 
 ```bash
-kind create cluster --name kind --config light-lab.yaml
-kubectl config use-context kind-kind
+cat > light-lab.yaml <<EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+networking:
+  disableDefaultCNI: true
+EOF
+```
+```bash
+kind create cluster --config light-lab.yaml
 ```
 
 </details>
 
-> **Note:** coredns and localpath pods will be stuck in "Pending" state as default CNI is disabled. As a result, nodes will not be ready as well.
+Check the nodes and the pods:
 
-## Cilium Installation (via Helm)
+```bash
+kubectl get nodes
+```
+```bash
+kubectl get pods -A
+```
+
+The nodes are `NotReady`, and the `coredns` and `local-path-provisioner` pods are
+`Pending`. This is expected: the cluster has **no CNI yet**, so pods cannot get a network.
+You fix that in the next step by installing Cilium.
+
+## Step 2 — Install Cilium with Helm
+
+Add the Cilium Helm repository:
 
 ```bash
 helm repo add cilium https://helm.cilium.io/
-
-helm upgrade --install cilium cilium/cilium -n kube-system \
---version 1.18.4 \
---set cluster.name=kind-kind \
---set ipam.mode=kubernetes \
---set operator.replicas=1 \
---set routingMode=tunnel \
---set tunnelProtocol=vxlan
 ```
 
-> **Note:** The cilium install command also accepts these Helm-style --set flags for
-> customization. By default, both cilium install and Helm will install the latest stable version of
-> Cilium. However, you can explicitly specify a version to ensure consistency across
-> environments or to avoid unexpected changes. This is especially useful in production,
-> where you may want to pin versions and manage upgrades intentionally.
-> You can watch the progress of the installation by typing `cilium status --wait`
-
-## Verify the Installation
-
-Once the installation is done, verify the installation with `cilium status`:
-
-```
-$ cilium status
-    /¯¯\
- /¯¯\__/¯¯\ Cilium:      OK
- \__/¯¯\__/ Operator:    OK
- /¯¯\__/¯¯\ Envoy DaemonSet: OK
- \__/¯¯\__/ Hubble Relay:    disabled
-     \__/   ClusterMesh:     disabled
-DaemonSet        cilium             Desired: 3, Ready: 3/3
-DaemonSet        cilium-envoy       Desired: 3, Ready: 3/3
-Deployment       cilium-operator    Desired: 1, Ready: 1/1
-Containers:      cilium             Running: 3
-                 cilium-envoy       Running: 3
-                 cilium-operator    Running: 1
-                 clustermesh-apiserver
-                 hubble-relay
-Cluster Pods:    3/3 managed by Cilium
-                 [...]
-```
-
-> **Note:** Since the Cilium agent and Envoy components are both deployed through
-> a DaemonSet, there is an instance of each deployed on every cluster node. As you
-> might have seen in the earlier cilium install --dry-run-helm-values output, a
-> single Cilium operator was deployed as part of the deployment. You can verify this
-> with the following kubectl commands:
+Install Cilium into the `kube-system` namespace:
 
 ```bash
-$ kubectl get -n kube-system daemonset cilium cilium-envoy
-NAME           DESIRED   READY   NODE SELECTOR
-cilium         3         3       kubernetes.io/os=linux
-cilium-envoy   3         3       kubernetes.io/os=linux
+helm install cilium cilium/cilium -n kube-system \
+  --version 1.18.4 \
+  --set cluster.name=kind-kind \
+  --set ipam.mode=kubernetes \
+  --set operator.replicas=1 \
+  --set routingMode=tunnel \
+  --set tunnelProtocol=vxlan
 ```
 
+What each setting does:
+
+- `--version 1.18.4` pins the Cilium version. Without it, Helm installs the latest
+  release, which can change from one day to the next. Pinning keeps every environment
+  the same.
+- `cluster.name=kind-kind` names the cluster, matching the kubectl context created by
+  kind.
+- `ipam.mode=kubernetes` makes Cilium give pod IPs from the address range Kubernetes
+  assigns to each node.
+- `operator.replicas=1` runs a single Cilium operator, enough for a small lab cluster.
+- `routingMode=tunnel` and `tunnelProtocol=vxlan` carry traffic between nodes inside a
+  VXLAN tunnel, so the nodes' network does not need to know the pod IPs.
+
+Wait until the installation is complete:
+
 ```bash
-$ kubectl get -n kube-system deployment cilium-operator
-NAME              READY   AVAILABLE
-cilium-operator   1/1     1
+cilium status --wait
 ```
+
+The command returns when all Cilium components are ready. This can take a few minutes.
+
+## Step 3 — Verify the Installation
+
+Show the status of Cilium:
+
+```bash
+cilium status
+```
+
+`Cilium`, `Operator` and `Envoy DaemonSet` must be `OK`. `Hubble Relay` and
+`ClusterMesh` are `disabled`, which is expected: they are not part of this installation.
+
+Cilium runs three components:
+
+| Component | Kind | Role |
+| --- | --- | --- |
+| `cilium` | DaemonSet (one pod per node) | the agent: loads the eBPF programs that handle pod networking |
+| `cilium-envoy` | DaemonSet (one pod per node) | the Envoy proxy used for Layer 7 features |
+| `cilium-operator` | Deployment (1 replica) | cluster-wide tasks, such as managing resources shared by all agents |
+
+Check them with kubectl:
+
+```bash
+kubectl get -n kube-system daemonset cilium cilium-envoy
+```
+```bash
+kubectl get -n kube-system deployment cilium-operator
+```
+
+Both DaemonSets show `3` desired and `3` ready pods, one per node. The operator shows
+`1/1`.
+
+Now that a CNI is installed, the cluster works normally:
+
+```bash
+kubectl get nodes
+```
+```bash
+kubectl get pods -A
+```
+
+All three nodes are `Ready`, and the `coredns` and `local-path-provisioner` pods that were
+`Pending` in step 1 are now `Running`.
 
 ## Cleanup (no need for BB)
 
@@ -139,6 +183,6 @@ Delete it only when you are done with the lab or want to start over:
 ```
 
 > **Note:** Deleting the cluster removes the Cilium installation with it. To come back,
-> re-run this scenario from [Create kind cluster](#create-kind-cluster-no-need-for-bb),
-> or run `./create-kind-cluster.sh` (without `--no-cilium`) from any later scenario's
-> folder to get a cluster with Cilium already installed.
+> re-run this scenario from [Step 1](#step-1--create-the-kind-cluster), or run
+> `./create-kind-cluster.sh` (without `--no-cilium`) from any later scenario's folder to
+> get a cluster with Cilium already installed.

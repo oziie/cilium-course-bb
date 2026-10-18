@@ -1,11 +1,20 @@
-**Scope:** Verify internode connectivity between two different applications that are scheduled on different Kubernetes nodes through Cilium's VXLAN-based tunneling.
+# Scenario 2 — Pod Connectivity
 
-## Prepare the kind cluster (no need for BB)
+**Scope:** Verify internode connectivity between two different applications that are
+scheduled on different Kubernetes nodes through Cilium's VXLAN-based tunneling.
+
+## Step 1 — Create the Cluster and Install Cilium
+
+In this scenario you check that two pods running on **different nodes** can talk to each
+other through Cilium's VXLAN tunnel. First, build the lab cluster: 1 control-plane and 2
+worker nodes, with Cilium as the network plugin (CNI). `routingMode=tunnel` and
+`tunnelProtocol=vxlan` carry traffic between nodes inside a VXLAN tunnel, which is what
+this scenario tests.
 
 This scenario runs on the same cluster as the previous ones: 1 control-plane + 2 workers
-with Cilium installed. If you are continuing from the previous scenario, skip this section.
-
-Otherwise, create (or reuse) the cluster with the script in this folder:
+with Cilium installed. If you are continuing from the previous scenario, the cluster is
+already there. Otherwise, create (or reuse) it with the
+[`create-kind-cluster.sh`](create-kind-cluster.sh) script in this folder:
 
 ```bash
 cd scenario-2-pod-connectivity
@@ -13,18 +22,71 @@ cd scenario-2-pod-connectivity
 kubectl config current-context   # should print kind-kind
 ```
 
-The script creates the cluster, installs Cilium with the same settings as
+The script creates the cluster from [`light-lab.yaml`](light-lab.yaml), installs Cilium
+with the same settings as
 [Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md) and waits until
-all nodes are `Ready`. If Cilium is already installed, it is left as is. Check it with:
+all nodes are `Ready`. If Cilium is already installed, it is left as is.
+
+<details>
+<summary>Manual alternative (the commands used on BB)</summary>
+
+Write the kind configuration file and create the cluster. `disableDefaultCNI: true` turns
+off kind's default network plugin so that Cilium can manage pod networking:
 
 ```bash
-cilium status
+cat > light-lab.yaml <<EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+networking:
+  disableDefaultCNI: true
+EOF
+```
+```bash
+kind create cluster --config light-lab.yaml
 ```
 
-## Deploy nginx application on `kind-worker2` node
+Install Cilium with Helm:
 
-```yaml
-# app-nginx.yaml
+```bash
+helm repo add cilium https://helm.cilium.io/
+```
+```bash
+helm install cilium cilium/cilium -n kube-system \
+  --version 1.18.4 \
+  --set cluster.name=kind-kind \
+  --set ipam.mode=kubernetes \
+  --set operator.replicas=1 \
+  --set routingMode=tunnel \
+  --set tunnelProtocol=vxlan
+```
+
+</details>
+
+Wait until Cilium is ready, then check the nodes:
+
+```bash
+cilium status --wait
+```
+```bash
+kubectl get nodes
+```
+
+All three nodes must be `Ready`: `kind-control-plane`, `kind-worker` and `kind-worker2`.
+
+## Step 2 — Deploy the Applications on Different Nodes
+
+Deploy two applications and pin each one to a different worker node with a
+`nodeSelector`:
+
+- **nginx**, a web server, on `kind-worker2`
+- **netshoot-client**, a pod with network tools such as `curl`, on `kind-worker`
+
+```bash
+kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -44,22 +106,7 @@ spec:
       containers:
         - name: nginx
           image: nginx
-```
-
-```bash
-$ kubectl apply -f app-nginx.yaml
-```
-
-```bash
-$ kubectl get pods -o wide
-NAME                                READY   IP              NODE
-nginx-deployment-979f5455f-tjd2w    1/1     10.244.2.127    kind-worker2
-```
-
-## Deploy a client app on `kind-worker` node
-
-```yaml
-# app-netshoot.yaml
+---
 apiVersion: v1
 kind: Pod
 metadata:
@@ -73,47 +120,59 @@ spec:
     - name: netshoot
       image: nicolaka/netshoot
       command: ["sleep", "infinity"]
+EOF
 ```
+
+Wait until both pods are running, then show where they run:
 
 ```bash
-$ kubectl apply -f app-netshoot.yaml
+kubectl wait --for=condition=Ready pod --all --timeout=120s
 ```
+```bash
+kubectl get pods -o wide
+```
+
+Look at the `IP` and `NODE` columns: nginx runs on `kind-worker2` and the netshoot-client on
+`kind-worker`, each with its own pod IP (for example `10.244.2.127` and `10.244.1.67`).
+The IPs come from different ranges because each node has its own pod address range.
+
+## Step 3 — Test Pod-to-Pod Connectivity
+
+Save the IP of the nginx pod in a variable:
 
 ```bash
-$ kubectl get pods -o wide
-NAME               READY   IP             NODE
-netshoot-client    1/1     10.244.1.67    kind-worker
+NGINX_IP=$(kubectl get pod -l app.kubernetes.io/name=nginx -o jsonpath='{.items[0].status.podIP}')
+echo $NGINX_IP
 ```
 
-## Connectivity Tests
-
-### Verify connectivity from `netshoot-client` to `nginx-server`
+From the client pod on `kind-worker`, request the nginx page on `kind-worker2`:
 
 ```bash
-$ kubectl exec pod/netshoot-client -- curl -s http://10.244.2.127
-<!DOCTYPE html>
-<html>
-<head>
-<title>Welcome to nginx!</title>
-[OUTPUT TRUNCATED]
+kubectl exec pod/netshoot-client -- curl -s http://$NGINX_IP
 ```
 
-### Verify HTTP connectivity
+You get the HTML of the **Welcome to nginx!** page.
+
+Now print only the HTTP status code:
 
 ```bash
-$ kubectl exec pod/netshoot-client -- \
-curl -s -o /dev/null \
--w "%{http_code}\n" \
-http://10.244.2.127
-200
+kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" http://$NGINX_IP
 ```
+
+The answer is `200`: the request succeeded.
+
+The two pods run on different nodes, so the request left `kind-worker`, travelled inside
+the **VXLAN tunnel** that Cilium set up between the nodes, and was delivered to the nginx
+pod on `kind-worker2`. You did not configure any route: Cilium handles pod-to-pod
+connectivity across nodes on its own.
 
 ## Cleanup
 
 Remove the test applications:
 
 ```bash
-kubectl delete -f app-nginx.yaml -f app-netshoot.yaml
+kubectl delete deployment nginx-deployment
+kubectl delete pod netshoot-client
 ```
 
 If you are done with the lab, delete the cluster too (no need for BB):

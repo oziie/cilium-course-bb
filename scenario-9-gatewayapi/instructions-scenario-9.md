@@ -1,44 +1,24 @@
 # Scenario 9 — Gateway API
 
-**Scope:** Expose the Bookinfo sample application with Cilium's **Gateway API**
-implementation, the successor to Ingress. Install the Gateway API CRDs, create a
-`Gateway`, route traffic with `HTTPRoute`s by path and header, and run a 90/10 canary
-rollout that the `Ingress` API cannot describe.
+**Scope:** Expose Bookinfo with Gateway API instead of Ingress: a `Gateway` owned by the
+platform team, `HTTPRoute`s owned by the application teams, path routing, and a canary
+rollout with weights and headers.
 
-## Why Gateway API
+## Step 1 — Create the Cluster, Install the Gateway API CRDs and Cilium
 
-Scenario 8 used an `Ingress`. Ingress is simple, but it only routes by host and path.
-Everything else (traffic splitting, header matching, rewrites) lives in
-controller-specific annotations that differ between implementations. Upstream
-ingress-nginx, the most widely used controller, has been retired, and the Kubernetes
-project points users to Gateway API instead.
-
-Gateway API splits the old `Ingress` object into resources owned by different roles:
+In Scenario 8 you exposed Bookinfo with an `Ingress`. Ingress only routes by host and
+path; anything more needs controller-specific annotations. **Gateway API** is its
+successor, and it splits the job into resources owned by different roles:
 
 | Resource | Owned by | What it describes |
 | --- | --- | --- |
 | `GatewayClass` | infrastructure provider | which controller implements Gateways (here: `cilium`) |
-| `Gateway` | platform / cluster operator | an entry point: listeners, ports, protocols, an IP |
-| `HTTPRoute` | application team | routing rules: matches, filters, backends, weights |
+| `Gateway` | platform team | an entry point: listeners, ports, an IP |
+| `HTTPRoute` | application team | routing rules: matches, backends, weights |
 
-Several teams can attach their own `HTTPRoute`s to one shared `Gateway` without touching
-each other's rules.
-
-```
-curl (Docker host) ──▶ 172.18.255.200 ──ARP──▶ kind-worker (eth0)
-                                                    │
-                                     Gateway my-gateway (Cilium Envoy)
-                                                    │
-               HTTPRoute bookinfo            HTTPRoute reviews
-              /details ──┬── /           /reviews ──┬── 90% ── reviews-v1
-                         ▼    ▼                     └── 10% ── reviews-v2
-                    details  productpage        (x-canary: true ──▶ reviews-v2)
-```
-
-## Prepare the kind cluster (no need for BB)
-
-Like Scenario 8, this scenario needs a cluster **without kube-proxy**. Delete the
-previous cluster first, then create a new one:
+This scenario needs a cluster **without kube-proxy**: Cilium replaces it.
+Delete any previous cluster, then create the new one with the
+[`create-kind-cluster.sh`](create-kind-cluster.sh) script in this folder:
 
 ```bash
 cd scenario-9-gatewayapi
@@ -47,57 +27,81 @@ cd scenario-9-gatewayapi
 kubectl config current-context      # should print kind-kind
 ```
 
-[`light-lab.yaml`](light-lab.yaml) is the same as in Scenario 8: 1 control-plane + 2
-workers, `disableDefaultCNI: true` and `kubeProxyMode: none`.
-
-### Gateway API CRDs come first
-
-Gateway API resources are not part of Kubernetes itself: they are CRDs maintained by the
-Kubernetes SIG Network project. **Install them before Cilium.** The Cilium operator only
-starts its Gateway API controller if the CRDs exist when it starts, and the Helm chart
-only creates the `cilium` GatewayClass if it sees the CRDs at install time.
-
-Cilium 1.18 supports Gateway API **v1.3.0**. The script installs the standard-channel
-CRDs that Cilium needs:
-
-```bash
-for crd in gatewayclasses gateways httproutes referencegrants grpcroutes; do
-  kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.3.0/config/crd/standard/gateway.networking.k8s.io_${crd}.yaml
-done
-```
-
-> **Note:** Always match the CRD version to your Cilium version (see the Gateway API page
-> of the Cilium docs for your release). `TLSRoute` lives in the *experimental* channel
-> and is not needed here.
-
-### Cilium settings
-
-The script then installs Cilium with [`cilium-values.yaml`](cilium-values.yaml):
+The kind config [`light-lab.yaml`](light-lab.yaml) is the usual 1 control-plane + 2
+workers with `disableDefaultCNI: true`, plus `kubeProxyMode: none`, which tells kind not
+to install kube-proxy. The script installs Cilium with the values in
+[`cilium-values.yaml`](cilium-values.yaml):
 
 ```yaml
 operator:
   replicas: 1
 routingMode: tunnel
 tunnelProtocol: vxlan
+ipam:
+  mode: kubernetes
 kubeProxyReplacement: true
 l2announcements:
   enabled: true
-ipam:
-  mode: kubernetes
 gatewayAPI:
   enabled: true
 ```
 
-- `kubeProxyReplacement: true`: required by Cilium's Gateway API support and by L2
-  announcements.
-- `l2announcements.enabled: true`: lets nodes answer ARP requests for Service IPs, as in
-  Scenario 8.
+- `kubeProxyReplacement: true`: required by Gateway API support and L2 announcements.
+- `l2announcements.enabled: true`: lets nodes answer ARP requests for Service IPs.
 - `gatewayAPI.enabled: true`: turns on the Gateway API controller in the Cilium operator.
 
-The script runs the equivalent of:
+Gateway API resources are CRDs, not built into Kubernetes. **They must be installed before
+Cilium:** Cilium only starts its Gateway API controller, and the Helm chart only creates
+the `cilium` GatewayClass, if the CRDs already exist. Cilium 1.18 supports Gateway API
+**v1.3.0**. The script installs these CRDs before Cilium for you.
+
+<details>
+<summary>Manual alternative (the commands used on BB)</summary>
 
 ```bash
-helm upgrade --install cilium cilium --repo https://helm.cilium.io/ -n kube-system \
+kind delete cluster --name kind
+```
+```bash
+cat > light-lab.yaml <<EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+networking:
+  disableDefaultCNI: true
+  kubeProxyMode: none
+EOF
+```
+```bash
+kind create cluster --config light-lab.yaml
+```
+```bash
+for crd in gatewayclasses gateways httproutes referencegrants grpcroutes; do
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.3.0/config/crd/standard/gateway.networking.k8s.io_${crd}.yaml
+done
+```
+```bash
+cat > cilium-values.yaml <<EOF
+operator:
+  replicas: 1
+routingMode: tunnel
+tunnelProtocol: vxlan
+ipam:
+  mode: kubernetes
+kubeProxyReplacement: true
+l2announcements:
+  enabled: true
+gatewayAPI:
+  enabled: true
+EOF
+```
+```bash
+helm repo add cilium https://helm.cilium.io/
+```
+```bash
+helm install cilium cilium/cilium -n kube-system \
   --version 1.18.4 \
   --set cluster.name=kind-kind \
   --set k8sServiceHost=kind-control-plane \
@@ -105,56 +109,81 @@ helm upgrade --install cilium cilium --repo https://helm.cilium.io/ -n kube-syst
   -f cilium-values.yaml
 ```
 
+</details>
+
+Wait until Cilium is ready:
+
+```bash
+cilium status --wait
+```
+
 Check the settings and the GatewayClass:
 
 ```bash
-$ cilium config view | grep -E 'kube-proxy-replacement|enable-l2-announcements|enable-gateway-api '
-enable-gateway-api                                true
-enable-l2-announcements                           true
-kube-proxy-replacement                            true
-$ kubectl get gatewayclass
-NAME     CONTROLLER                     ACCEPTED   AGE
-cilium   io.cilium/gateway-controller   True       2m
+cilium config view | grep -E 'kube-proxy-replacement|enable-l2-announcements|enable-gateway-api '
+```
+```bash
+kubectl get gatewayclass
 ```
 
-`ACCEPTED True` means the Cilium operator has taken ownership of the `cilium` class.
+All three settings are `true`, and the `cilium` GatewayClass shows `ACCEPTED` `True`:
+the Cilium operator has taken ownership of it.
 
-> **Troubleshooting:** If `kubectl get gatewayclass` returns `No resources found` or
-> `error: the server doesn't have a resource type "gatewayclass"`, the CRDs were missing
-> when Cilium was installed. Install the CRDs, then restart the operator:
-> `kubectl -n kube-system rollout restart deployment/cilium-operator`. If the class is
-> still missing, recreate the cluster.
-
-## Deploy Bookinfo and Prepare the External IP
+## Step 2 — Deploy Bookinfo and Create the Gateway
 
 Deploy [Bookinfo](https://istio.io/latest/docs/examples/bookinfo/), the same sample
 application as in Scenario 8:
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/bookinfo/platform/kube/bookinfo.yaml
+```
+```bash
 kubectl wait --for=condition=Ready pod --all --timeout=300s
 ```
 
-A `Gateway` gets a `LoadBalancer` Service, so it needs LB-IPAM and an L2 announcement
-policy, exactly like the Ingress in Scenario 8. Check the subnet of the `kind` Docker
-network and apply [`lb-ippool.yaml`](lb-ippool.yaml) and
-[`l2-announcement-policy.yaml`](l2-announcement-policy.yaml):
+A `Gateway` gets a `LoadBalancer` Service, so it needs an external IP exactly like the
+Ingress in Scenario 8: an LB-IPAM pool inside the `kind` Docker network, and an L2
+announcement policy so a worker answers ARP requests for that IP. Check the subnet:
 
 ```bash
-docker network inspect kind | grep Subnet   # usually 172.18.0.0/16
-kubectl apply -f lb-ippool.yaml -f l2-announcement-policy.yaml
+docker network inspect kind | grep Subnet
 ```
 
-> **Note:** If your IPv4 subnet is different (for example `172.19.0.0/16`), change the
-> `cidr` in `lb-ippool.yaml` to the same range in your subnet (`172.19.255.200/29`)
-> before applying.
+It is usually `172.18.0.0/16`. Create the pool and the policy:
 
-## Create the Gateway
+```bash
+kubectl apply -f - <<EOF
+apiVersion: cilium.io/v2
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: pool
+spec:
+  blocks:
+    - cidr: 172.18.255.200/29
+---
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: policy1
+spec:
+  loadBalancerIPs: true
+  interfaces:
+    - eth0
+  nodeSelector:
+    matchExpressions:
+      - key: node-role.kubernetes.io/control-plane
+        operator: DoesNotExist
+EOF
+```
 
-[`gateway.yaml`](gateway.yaml) opens one HTTP listener on port 80, implemented by the
-`cilium` GatewayClass:
+> **Note:** If your IPv4 subnet is different, for example `172.19.0.0/16`, use the same
+> range in your subnet (`172.19.255.200/29`) in the command above.
 
-```yaml
+Now create the **Gateway**: one HTTP listener on port 80, implemented by the `cilium`
+GatewayClass. This is the platform team's part:
+
+```bash
+kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
@@ -166,44 +195,40 @@ spec:
     - name: http
       protocol: HTTP
       port: 80
+EOF
 ```
+
+Cilium creates a `LoadBalancer` Service named `cilium-gateway-my-gateway`, and LB-IPAM
+gives it an IP:
 
 ```bash
-$ kubectl apply -f gateway.yaml
-$ kubectl get gateway my-gateway
-NAME         CLASS    ADDRESS          PROGRAMMED   AGE
-my-gateway   cilium   172.18.255.200   True         10s
+kubectl get gateway my-gateway
 ```
-
-Cilium creates a `LoadBalancer` Service named `cilium-gateway-<gateway name>`, and
-LB-IPAM gives it an IP right away:
-
 ```bash
-$ kubectl get svc cilium-gateway-my-gateway
-NAME                        TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)
-cilium-gateway-my-gateway   LoadBalancer   10.96.53.120   172.18.255.200   80:30412/TCP
+kubectl get svc cilium-gateway-my-gateway
 ```
 
-Save the address:
+The Gateway shows the same IP in `ADDRESS` and `PROGRAMMED` `True`. Save the IP:
 
 ```bash
 GATEWAY_IP=$(kubectl get gateway my-gateway -o jsonpath='{.status.addresses[0].value}')
 echo $GATEWAY_IP
 ```
 
-The Gateway has an IP, but no routes yet. Any request returns `404`:
+The Gateway has no routes yet, so every request returns `404`:
 
 ```bash
-$ curl -s -o /dev/null -w "%{http_code}\n" "http://$GATEWAY_IP/"
-404
+curl -s -o /dev/null -w "%{http_code}\n" "http://$GATEWAY_IP/"
 ```
 
-## Route by Path with an HTTPRoute
+## Step 3 — Route by Path with an HTTPRoute
 
-[`httproute-bookinfo.yaml`](httproute-bookinfo.yaml) does what the Ingress did in
-Scenario 8: `/details` goes to `details`, everything else to `productpage`:
+An **HTTPRoute** is the application team's part: it attaches to a Gateway and says
+where requests go. Create one that does what the Ingress did in Scenario 8: `/details`
+goes to `details`, everything else to `productpage`:
 
-```yaml
+```bash
+kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -227,49 +252,88 @@ spec:
       backendRefs:
         - name: productpage
           port: 9080
+EOF
 ```
 
-- `parentRefs` attaches the route to `my-gateway`. The route belongs to the app team,
-  the Gateway to the platform team.
+- `parentRefs` attaches the route to `my-gateway`.
 - `backendRefs` points to Services and ports directly.
-- When several rules match, the **most specific** match wins, so `/details/1` goes to
+- When several rules match, the **most specific** one wins, so `/details/1` goes to
   `details` even though `/` also matches. Rule order does not matter.
 
-```bash
-$ kubectl apply -f httproute-bookinfo.yaml
-$ kubectl get httproute bookinfo -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}{"\n"}'
-True
-$ curl --fail -s -o /dev/null -w "%{http_code}\n" "http://$GATEWAY_IP/"
-200
-$ curl --fail -s "http://$GATEWAY_IP/details/1"
-{"id":1,"author":"William Shakespeare","year":1595,...}
-```
-
-> **Note:** On macOS (Docker Desktop, OrbStack), Docker runs in a VM, so `curl` from the
-> Mac cannot reach the IP. Run it from a container on the `kind` network:
->
-> ```bash
-> docker run --rm --network kind curlimages/curl -s "http://$GATEWAY_IP/details/1"
-> ```
-
-## Canary Rollout with Weights and Headers
-
-Bookinfo runs three versions of the `reviews` service (`v1`, `v2`, `v3`) behind a single
-`reviews` Service. This section uses only `v1` (the current version) and `v2` (the
-canary), so it creates Services for those two. The `v3` pods keep running, but the route
-below never sends traffic to them.
-
-To send a chosen share of traffic to each version, give each version its own Service. [`reviews-services.yaml`](reviews-services.yaml) creates `reviews-v1`
-and `reviews-v2`, selecting pods by their `version` label:
+Check that the Gateway accepted the route:
 
 ```bash
-kubectl apply -f reviews-services.yaml
+kubectl get httproute bookinfo -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}{"\n"}'
 ```
 
-[`httproute-reviews-canary.yaml`](httproute-reviews-canary.yaml) is a **second**
-`HTTPRoute` on the same Gateway, as another team would write it:
+It prints `True`.
 
-```yaml
+**Call the application from outside the cluster.** If `GATEWAY_IP` is empty, set it
+again with the `GATEWAY_IP=...` command of step 2:
+
+```bash
+echo $GATEWAY_IP
+```
+
+`/` goes to `productpage` and returns HTTP code `200`:
+
+```bash
+curl --fail -s -o /dev/null -w "%{http_code}\n" "http://$GATEWAY_IP/"
+```
+
+`/details/1` goes to the `details` service and returns the details of book 1 as JSON:
+
+```bash
+curl --fail -s "http://$GATEWAY_IP/details/1"
+```
+
+So far this is the same result as the Ingress. The next step does something an `Ingress`
+cannot describe.
+
+## Step 4 — Canary Rollout with Weights and Headers
+
+Bookinfo runs three versions of the `reviews` service (`v1`, `v2`, `v3`) behind one
+`reviews` Service. This step uses only `v1` (the current version) and `v2` (the canary),
+so it creates Services for those two. The `v3` pods keep running, but the route below
+never sends traffic to them.
+
+To send a chosen share of traffic to each version, give each version its own Service,
+selected by the pods' `version` label:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Service
+metadata:
+  name: reviews-v1
+spec:
+  selector:
+    app: reviews
+    version: v1
+  ports:
+    - name: http
+      port: 9080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reviews-v2
+spec:
+  selector:
+    app: reviews
+    version: v2
+  ports:
+    - name: http
+      port: 9080
+EOF
+```
+
+Now add a **second** HTTPRoute on the same Gateway, as another team would. It sends 90%
+of `/reviews` traffic to v1 and 10% to the new v2, and always sends testers who set the
+`x-canary: true` header to v2:
+
+```bash
+kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -279,7 +343,6 @@ spec:
   parentRefs:
     - name: my-gateway
   rules:
-    # Testers who send "x-canary: true" always get v2.
     - matches:
         - path:
             type: PathPrefix
@@ -290,7 +353,6 @@ spec:
       backendRefs:
         - name: reviews-v2
           port: 9080
-    # Everyone else: 90% v1, 10% v2.
     - matches:
         - path:
             type: PathPrefix
@@ -302,55 +364,53 @@ spec:
         - name: reviews-v2
           port: 9080
           weight: 10
+EOF
 ```
 
 - `weight` splits traffic between backends in proportion: 90 + 10 = 100, so 90% and 10%.
-- Both rules match `/reviews`, but the first one also matches a header, so it is more
+- Both rules match `/reviews`, but the first also matches a header, so it is more
   specific and wins for requests with `x-canary: true`.
-
-Neither of these can be written with a plain `Ingress`.
-
-```bash
-kubectl apply -f httproute-reviews-canary.yaml
-```
 
 Each reviews response includes the name of the pod that served it. Send 100 requests and
 count the versions:
 
 ```bash
-$ for i in $(seq 1 100); do curl -s "http://$GATEWAY_IP/reviews/0" | grep -o 'reviews-v[0-9]'; done | sort | uniq -c
-     91 reviews-v1
-      9 reviews-v2
+for i in $(seq 1 100); do curl -s "http://$GATEWAY_IP/reviews/0" | grep -o 'reviews-v[0-9]'; done | sort | uniq -c
 ```
 
-The split is about 90/10. It is random per request, so your numbers vary a little.
-
-With the header, every request goes to v2:
+About 90 go to `reviews-v1` and 10 to `reviews-v2`. The split is random per request, so
+your numbers vary a little. With the header, every request goes to v2:
 
 ```bash
-$ for i in $(seq 1 20); do curl -s -H "x-canary: true" "http://$GATEWAY_IP/reviews/0" | grep -o 'reviews-v[0-9]'; done | sort | uniq -c
-     20 reviews-v2
+for i in $(seq 1 20); do curl -s -H "x-canary: true" "http://$GATEWAY_IP/reviews/0" | grep -o 'reviews-v[0-9]'; done | sort | uniq -c
 ```
 
-The canary looks healthy, so **promote v2** by moving all weight to it:
+The canary looks healthy, so **promote v2** by moving all weight to it, then count again:
 
 ```bash
 kubectl patch httproute reviews --type=json -p '[
   {"op": "replace", "path": "/spec/rules/1/backendRefs/0/weight", "value": 0},
   {"op": "replace", "path": "/spec/rules/1/backendRefs/1/weight", "value": 100}
 ]'
+```
+```bash
 for i in $(seq 1 50); do curl -s "http://$GATEWAY_IP/reviews/0" | grep -o 'reviews-v[0-9]'; done | sort | uniq -c
 ```
 
-All 50 requests now go to `reviews-v2`. No pods restarted: Cilium only reprogrammed Envoy.
+All 50 requests now go to `reviews-v2`. No pod restarted: Cilium only reprogrammed its
+Envoy proxy. Two teams' routes share one Gateway and one IP, and the traffic split lives
+in the standard API instead of in controller-specific annotations.
 
 ## Cleanup
 
 Remove the routes, the Gateway, the Cilium objects and Bookinfo:
 
 ```bash
-kubectl delete -f httproute-reviews-canary.yaml -f reviews-services.yaml -f httproute-bookinfo.yaml -f gateway.yaml
-kubectl delete -f l2-announcement-policy.yaml -f lb-ippool.yaml
+kubectl delete httproute reviews bookinfo
+kubectl delete service reviews-v1 reviews-v2
+kubectl delete gateway my-gateway
+kubectl delete ciliuml2announcementpolicy policy1
+kubectl delete ciliumloadbalancerippool pool
 kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/bookinfo/platform/kube/bookinfo.yaml
 ```
 

@@ -1,30 +1,24 @@
 # Scenario 8 — Ingress
 
 **Scope:** Expose the Bookinfo sample application with Cilium's built-in Ingress
-controller. Give the Ingress an external IP with LB-IPAM, make that IP reachable with an
-L2 announcement policy, and call the application with `curl` from outside the cluster.
+controller, give it an external IP with LB-IPAM, make that IP reachable with L2
+announcements, and call the application from outside the cluster.
 
-## How the Pieces Fit Together
+## Step 1 — Create the Cluster and Install Cilium with Ingress
 
-| Piece | What it does |
+In this scenario you expose the **Bookinfo** sample application with Cilium's built-in
+**Ingress controller**, give it an external IP, and call it with `curl` from outside the
+cluster. Three Cilium features work together:
+
+| Feature | What it does |
 | --- | --- |
-| Cilium Ingress controller | turns an `Ingress` with `ingressClassName: cilium` into Envoy routing rules and a `LoadBalancer` Service |
+| Ingress controller | turns an `Ingress` into Envoy routing rules and a `LoadBalancer` Service |
 | LB-IPAM (`CiliumLoadBalancerIPPool`) | gives `LoadBalancer` Services an external IP from a pool you define |
-| L2 announcements (`CiliumL2AnnouncementPolicy`) | makes a node answer ARP requests for that IP, so hosts on the same network can reach it |
+| L2 announcements (`CiliumL2AnnouncementPolicy`) | makes a node answer ARP requests for that IP, so the machine running kind can reach it |
 
-```
-curl (Docker host) ──▶ 172.18.255.200 ──ARP──▶ kind-worker (eth0)
-                                                    │
-                                              Cilium Envoy
-                                        /details ──┴── /
-                                           ▼           ▼
-                                        details    productpage
-```
-
-## Prepare the kind cluster (no need for BB)
-
-This scenario needs Cilium features that the previous clusters do not have, and a
-cluster **without kube-proxy**. Delete the previous cluster first, then create a new one:
+This scenario needs a cluster **without kube-proxy**: Cilium replaces it.
+Delete any previous cluster, then create the new one with the
+[`create-kind-cluster.sh`](create-kind-cluster.sh) script in this folder:
 
 ```bash
 cd scenario-8-ingress
@@ -34,34 +28,72 @@ kubectl config current-context      # should print kind-kind
 ```
 
 The kind config [`light-lab.yaml`](light-lab.yaml) is the usual 1 control-plane + 2
-workers, plus `kubeProxyMode: none`: Cilium replaces kube-proxy in this scenario.
-
-The script installs Cilium with the values in [`cilium-values.yaml`](cilium-values.yaml):
+workers with `disableDefaultCNI: true`, plus `kubeProxyMode: none`, which tells kind not
+to install kube-proxy. The script installs Cilium with the values in
+[`cilium-values.yaml`](cilium-values.yaml):
 
 ```yaml
 operator:
   replicas: 1
 routingMode: tunnel
 tunnelProtocol: vxlan
+ipam:
+  mode: kubernetes
 kubeProxyReplacement: true
 l2announcements:
   enabled: true
-ipam:
-  mode: kubernetes
 ingressController:
   enabled: true
 ```
 
-- `kubeProxyReplacement: true`: Cilium handles Services in eBPF. The Ingress controller and
-  L2 announcements both require it.
+- `kubeProxyReplacement: true`: Cilium handles Services with eBPF instead of kube-proxy.
+  The Ingress controller and L2 announcements both require it.
 - `l2announcements.enabled: true`: lets nodes answer ARP requests for Service IPs.
 - `ingressController.enabled: true`: turns on the Cilium Ingress controller and the
   `cilium` IngressClass.
 
-The script runs the equivalent of:
+<details>
+<summary>Manual alternative (the commands used on BB)</summary>
 
 ```bash
-helm upgrade --install cilium cilium --repo https://helm.cilium.io/ -n kube-system \
+kind delete cluster --name kind
+```
+```bash
+cat > light-lab.yaml <<EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+networking:
+  disableDefaultCNI: true
+  kubeProxyMode: none
+EOF
+```
+```bash
+kind create cluster --config light-lab.yaml
+```
+```bash
+cat > cilium-values.yaml <<EOF
+operator:
+  replicas: 1
+routingMode: tunnel
+tunnelProtocol: vxlan
+ipam:
+  mode: kubernetes
+kubeProxyReplacement: true
+l2announcements:
+  enabled: true
+ingressController:
+  enabled: true
+EOF
+```
+```bash
+helm repo add cilium https://helm.cilium.io/
+```
+```bash
+helm install cilium cilium/cilium -n kube-system \
   --version 1.18.4 \
   --set cluster.name=kind-kind \
   --set k8sServiceHost=kind-control-plane \
@@ -69,49 +101,52 @@ helm upgrade --install cilium cilium --repo https://helm.cilium.io/ -n kube-syst
   -f cilium-values.yaml
 ```
 
-> **Note:** Without kube-proxy, nothing translates the `kubernetes` Service IP before Cilium
-> is running. `k8sServiceHost` and `k8sServicePort` tell the Cilium agent to reach the API
-> server directly instead.
+</details>
+
+Without kube-proxy, nothing can route the `kubernetes` Service IP before Cilium runs.
+`k8sServiceHost` and `k8sServicePort` tell Cilium to reach the API server directly at
+`kind-control-plane:6443`.
+
+Wait until Cilium is ready:
+
+```bash
+cilium status --wait
+```
 
 Check the settings and the IngressClass:
 
 ```bash
-$ cilium config view | grep -E 'kube-proxy-replacement|enable-l2-announcements|enable-ingress-controller'
-enable-ingress-controller                         true
-enable-l2-announcements                           true
-kube-proxy-replacement                            true
-$ kubectl get ingressclass
-NAME     CONTROLLER                     PARAMETERS   AGE
-cilium   cilium.io/ingress-controller   <none>       2m
+cilium config view | grep -E 'kube-proxy-replacement|enable-l2-announcements|enable-ingress-controller'
+```
+```bash
+kubectl get ingressclass
 ```
 
-## Deploy the Bookinfo Application
+All three settings are `true`, and an IngressClass named `cilium` exists.
+
+## Step 2 — Deploy Bookinfo and Create the Ingress
 
 [Bookinfo](https://istio.io/latest/docs/examples/bookinfo/) is a small sample application
 from the Istio project: a `productpage` web page that calls the `details`, `reviews` and
-`ratings` services.
+`ratings` services. Deploy it:
 
 ```bash
-$ kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/bookinfo/platform/kube/bookinfo.yaml
-$ kubectl wait --for=condition=Ready pod --all --timeout=180s
-$ kubectl get svc
-NAME          TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)
-details       ClusterIP   10.96.120.33    <none>        9080/TCP
-kubernetes    ClusterIP   10.96.0.1       <none>        443/TCP
-productpage   ClusterIP   10.96.211.5     <none>        9080/TCP
-ratings       ClusterIP   10.96.48.170    <none>        9080/TCP
-reviews       ClusterIP   10.96.92.14     <none>        9080/TCP
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/bookinfo/platform/kube/bookinfo.yaml
+```
+```bash
+kubectl wait --for=condition=Ready pod --all --timeout=300s
+```
+```bash
+kubectl get svc
 ```
 
-> **Note:** Your IPs and names will differ. The outputs in this scenario are examples,
-> so read them for their shape, not their exact values.
+All Bookinfo services are `ClusterIP`, reachable only from inside the cluster.
 
-## Create the Ingress
+Create an Ingress that sends `/details` to the `details` service and everything else
+(`/`) to `productpage`:
 
-[`ingress-basic.yaml`](ingress-basic.yaml) sends `/details` to the `details` service and
-everything else (`/`) to `productpage`:
-
-```yaml
+```bash
+kubectl apply -f - <<EOF
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -122,103 +157,98 @@ spec:
   rules:
     - http:
         paths:
-          - backend:
+          - path: /details
+            pathType: Prefix
+            backend:
               service:
                 name: details
                 port:
                   number: 9080
-            path: /details
+          - path: /
             pathType: Prefix
-          - backend:
+            backend:
               service:
                 name: productpage
                 port:
                   number: 9080
-            path: /
-            pathType: Prefix
+EOF
 ```
+
+- `ingressClassName: cilium` hands this Ingress to the Cilium Ingress controller.
+- `pathType: Prefix` matches the path and everything below it: `/details` also matches
+  `/details/1`.
+
+Cilium creates a `LoadBalancer` Service for the Ingress:
 
 ```bash
-kubectl apply -f ingress-basic.yaml
+kubectl get svc cilium-ingress-basic-ingress
 ```
 
-Cilium creates a `LoadBalancer` Service for the Ingress, but it has no external IP yet:
+Its `EXTERNAL-IP` is `<pending>`. In a cloud, the provider's load balancer would fill it
+in. kind has none, so you give Cilium a pool of IPs to use in the next step.
+
+## Step 3 — Assign an External IP with LB-IPAM
+
+LB-IPAM gives `LoadBalancer` Services an IP from a `CiliumLoadBalancerIPPool`. The IP must
+be reachable from this machine, so the pool has to be **inside the subnet of the `kind`
+Docker network**, where the kind nodes are connected. Check it:
 
 ```bash
-$ kubectl get svc cilium-ingress-basic-ingress
-NAME                           TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)
-cilium-ingress-basic-ingress   LoadBalancer   10.96.162.89   <pending>     80:31734/TCP,443:30947/TCP
+docker network inspect kind | grep Subnet
 ```
 
-In a cloud, the provider's load balancer would fill in `EXTERNAL-IP`. kind has none, so
-Cilium has to assign the IP itself.
-
-## Assign an External IP with LB-IPAM
-
-LB-IPAM assigns IPs to `LoadBalancer` Services from a `CiliumLoadBalancerIPPool`. The IPs
-must be reachable from where you run `curl`, so the pool has to sit **inside the subnet
-of the `kind` Docker network**. Check it:
+The IPv4 subnet is usually `172.18.0.0/16`. Create a pool of 8 addresses at the top of
+it, far from the IPs Docker gives the nodes (`172.18.0.2`, `172.18.0.3`, ...):
 
 ```bash
-$ docker network inspect kind | grep Subnet
-                    "Subnet": "172.18.0.0/16",
-                    "Subnet": "fc00:f853:ccd:e793::/64",
-```
-
-[`lb-ippool.yaml`](lb-ippool.yaml) uses `172.18.255.200/29`, at the top of `172.18.0.0/16`,
-far from the IPs Docker gives the nodes (`172.18.0.2`, `172.18.0.3`, ...):
-
-```yaml
-apiVersion: "cilium.io/v2"
+kubectl apply -f - <<EOF
+apiVersion: cilium.io/v2
 kind: CiliumLoadBalancerIPPool
 metadata:
-  name: "pool"
+  name: pool
 spec:
   blocks:
-    - cidr: "172.18.255.200/29"
+    - cidr: 172.18.255.200/29
+EOF
 ```
 
-> **Note:** If your IPv4 subnet is different (for example `172.19.0.0/16`), change the
-> `cidr` to the same range in your subnet (`172.19.255.200/29`) before applying.
+> **Note:** If your IPv4 subnet is different, for example `172.19.0.0/16`, use the same
+> range in your subnet (`172.19.255.200/29`) in the command above.
+
+The Service gets an IP from the pool right away:
 
 ```bash
-$ kubectl apply -f lb-ippool.yaml
-$ kubectl get svc cilium-ingress-basic-ingress
-NAME                           TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)
-cilium-ingress-basic-ingress   LoadBalancer   10.96.162.89   172.18.255.200   80:31734/TCP,443:30947/TCP
+kubectl get svc cilium-ingress-basic-ingress
 ```
-
-The Ingress shows the same address:
-
 ```bash
-$ kubectl get ingress
-NAME            CLASS    HOSTS   ADDRESS          PORTS   AGE
-basic-ingress   cilium   *       172.18.255.200   80      13m
+kubectl get ingress basic-ingress
 ```
 
-Save it in a variable to reuse it:
+The Service's `EXTERNAL-IP` and the Ingress `ADDRESS` show the same IP, for example
+`172.18.255.200`. Save it in a variable:
 
 ```bash
 INGRESS_IP=$(kubectl get ingress basic-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 echo $INGRESS_IP
 ```
 
-## Make the IP Reachable with L2 Announcements
+The Service has an IP now, but **no machine claims it on the network yet**. When this
+machine sends an ARP request ("who has this IP?"), nobody answers, so `curl` cannot reach
+it. The next step fixes that.
 
-The Service has an IP now, but no machine on the network claims it yet. When the Docker
-host sends an ARP request for `172.18.255.200`, nobody answers.
+## Step 4 — Announce the IP and Call the Application
 
 **Layer 2 announcement** lets nodes advertise Service IPs on the local network with ARP
-(IPv4) or Neighbor Discovery (IPv6). Hosts in the same layer 2 domain can then reach those
-IPs without a separate load balancer. A `CiliumL2AnnouncementPolicy` selects which nodes
-and interfaces announce them.
+(IPv4). Machines on the same network, like the one running kind, can then reach those IPs
+without a separate load balancer. A `CiliumL2AnnouncementPolicy` selects which nodes and
+interfaces announce them.
 
-[`l2-announcement-policy.yaml`](l2-announcement-policy.yaml) makes Cilium answer ARP
-requests on the `eth0` interface of the **worker** nodes for the IPs of `LoadBalancer`
-Services:
+Make the worker nodes answer ARP requests on their `eth0` interface for the IPs of
+`LoadBalancer` Services:
 
-```yaml
-apiVersion: "cilium.io/v2alpha1"
+```bash
+kubectl apply -f - <<EOF
+apiVersion: cilium.io/v2alpha1
 kind: CiliumL2AnnouncementPolicy
 metadata:
   name: policy1
@@ -230,54 +260,71 @@ spec:
     matchExpressions:
       - key: node-role.kubernetes.io/control-plane
         operator: DoesNotExist
+EOF
 ```
 
-```bash
-kubectl apply -f l2-announcement-policy.yaml
-```
+- `loadBalancerIPs: true` announces the external IPs of `LoadBalancer` Services.
+- `interfaces` lists the node interfaces to answer on. `eth0` connects kind nodes to the
+  Docker network.
+- The `nodeSelector` picks every node **without** the control-plane label: the two
+  workers.
 
 Only one node answers for a given IP at a time. The nodes elect it with a Kubernetes
-`Lease`, so you can see which worker currently owns the IP:
+`Lease`. See which worker owns the IP:
 
 ```bash
-$ kubectl -n kube-system get lease | grep l2announce
-cilium-l2announce-default-cilium-ingress-basic-ingress   kind-worker   1m
+kubectl -n kube-system get lease | grep l2announce
 ```
 
 If that node goes down, another worker takes over the lease and starts answering.
 
-## Call the Application from Outside the Cluster
-
-Run these on the **Docker host** (the machine where kind runs), not inside a pod.
-
-`/` goes to `productpage`, which returns HTTP 200:
+**Call the application from outside the cluster.** If `INGRESS_IP` is empty, set it again with the `INGRESS_IP=...` command of step 3:
 
 ```bash
-$ curl --fail -s -o /dev/null -w "%{http_code}\n" "http://$INGRESS_IP/"
-200
+echo $INGRESS_IP
 ```
 
-`/details/1` goes to the `details` service and returns the details of book 1:
+`/` goes to `productpage` and returns HTTP code `200`:
 
 ```bash
-$ curl --fail -s "http://$INGRESS_IP/details/1"
-{"id":1,"author":"William Shakespeare","year":1595,"type":"paperback","pages":200,"publisher":"PublisherA","language":"English","ISBN-10":"1234567890","ISBN-13":"123-1234567890"}
+curl --fail -s -o /dev/null -w "%{http_code}\n" "http://$INGRESS_IP/"
 ```
 
-> **Note:** On macOS (Docker Desktop, OrbStack), Docker runs in a VM and the `kind` network
-> lives inside it, so `curl` from the Mac cannot reach the IP. Run `curl` inside that VM,
-> or from a container attached to the `kind` network:
->
-> ```bash
-> docker run --rm --network kind curlimages/curl -s "http://$INGRESS_IP/details/1"
-> ```
+`/details/1` goes to the `details` service and returns the details of book 1 as JSON:
+
+```bash
+curl --fail -s "http://$INGRESS_IP/details/1"
+```
+
+The request travelled: this machine → ARP answer from a worker → Cilium's Envoy on that
+node → the `details` or `productpage` pod, chosen by the path rules of the Ingress.
+
+```
+ this machine  (curl http://$INGRESS_IP/...)
+      |
+      |  1. ARP: "who has $INGRESS_IP?"
+      v
+ worker node holding the lease  (answers the ARP request)
+      |
+      |  2. HTTP request
+      v
+ Cilium's Envoy on that node
+      |
+      |  3. path rules of the Ingress
+      |
+      +-- /details/...           -->  details pod
+      |
+      +-- /  (everything else)   -->  productpage pod
+```
 
 ## Cleanup
 
 Remove the Ingress, the Cilium objects and Bookinfo:
 
 ```bash
-kubectl delete -f l2-announcement-policy.yaml -f lb-ippool.yaml -f ingress-basic.yaml
+kubectl delete ciliuml2announcementpolicy policy1
+kubectl delete ciliumloadbalancerippool pool
+kubectl delete ingress basic-ingress
 kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.24/samples/bookinfo/platform/kube/bookinfo.yaml
 ```
 

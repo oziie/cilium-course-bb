@@ -4,11 +4,16 @@
 pod, pod to Service, DNS lookups, traffic leaving the cluster and a failed connection. No
 network policy is used in this scenario, Hubble only observes.
 
-## Prepare the kind cluster (no need for BB)
+## Step 1 — Create the Cluster, Install Cilium and Deploy the Applications
+
+In this scenario you turn on **Hubble**, Cilium's observability layer, and watch the
+traffic of a small application: pod to pod, pod to Service, DNS lookups, traffic leaving
+the cluster and a failed connection. No network policy is used: Hubble only observes.
 
 This scenario runs on the same cluster as the previous ones: 1 control-plane + 2 workers
-with Cilium installed. Run the script in this folder **even if you are continuing from the
-previous scenario**: on top of the usual setup, it enables Hubble Relay and Hubble UI.
+with Cilium installed. If you are continuing from the previous scenario, the cluster is
+already there. Otherwise, create (or reuse) it with the
+[`create-kind-cluster.sh`](create-kind-cluster.sh) script in this folder:
 
 ```bash
 cd scenario-6-observability-with-hubble
@@ -16,186 +21,185 @@ cd scenario-6-observability-with-hubble
 kubectl config current-context   # should print kind-kind
 ```
 
-The script creates (or reuses) the cluster, installs Cilium with the same settings as
-[Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md) if it is not
-installed yet, then enables Hubble Relay and UI and waits until everything is ready. An
-existing Cilium installation keeps its version and its other settings.
+The script creates the cluster from [`light-lab.yaml`](light-lab.yaml), installs Cilium
+with the same settings as
+[Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md) and waits until
+all nodes are `Ready`. If Cilium is already installed, it is left as is.
 
-> **Note:** If policies from scenarios 4 or 5 are still in the cluster, delete them first
-> (`kubectl delete cnp --all -A`). This scenario observes traffic without any policy.
+<details>
+<summary>Manual alternative (the commands used on BB)</summary>
 
-## What is Hubble?
-
-Cilium's eBPF programs already see every packet that enters or leaves a pod. Hubble
-records those events as **flows** and lets you query them. It has three parts:
-
-| Part | Where it runs | What it does |
-| --- | --- | --- |
-| Hubble server | inside every `cilium` agent | records the flows of its own node |
-| Hubble Relay | `hubble-relay` Deployment | collects flows from all nodes into one API |
-| Hubble UI | `hubble-ui` Deployment | draws a service map from the flows in a browser |
-
-```
- kind-control-plane     kind-worker          kind-worker2
-┌────────────────┐   ┌────────────────┐   ┌────────────────┐
-│ cilium agent   │   │ cilium agent   │   │ cilium agent   │
-│  └ Hubble      │   │  └ Hubble      │   │  └ Hubble      │
-└───────┬────────┘   └───────┬────────┘   └───────┬────────┘
-        └────────────────────┼────────────────────┘
-                             ▼
-                      ┌──────────────┐
-                      │ Hubble Relay │◀── hubble CLI (localhost:4245)
-                      └──────┬───────┘
-                             ▼
-                      ┌──────────────┐
-                      │  Hubble UI   │◀── browser (localhost:12000)
-                      └──────────────┘
-```
-
-The Hubble server is on by default. Relay and the UI have to be enabled.
-
-## Check Hubble Relay and UI
-
-The `create-kind-cluster.sh` script already enabled them with a Helm upgrade of the
-existing Cilium release:
+Write the kind configuration file and create the cluster. `disableDefaultCNI: true` turns
+off kind's default network plugin so that Cilium can manage pod networking:
 
 ```bash
-helm upgrade cilium cilium --repo https://helm.cilium.io/ -n kube-system \
+cat > light-lab.yaml <<EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+networking:
+  disableDefaultCNI: true
+EOF
+```
+```bash
+kind create cluster --config light-lab.yaml
+```
+
+Install Cilium with Helm:
+
+```bash
+helm repo add cilium https://helm.cilium.io/
+```
+```bash
+helm install cilium cilium/cilium -n kube-system \
+  --version 1.18.4 \
+  --set cluster.name=kind-kind \
+  --set ipam.mode=kubernetes \
+  --set operator.replicas=1 \
+  --set routingMode=tunnel \
+  --set tunnelProtocol=vxlan
+```
+
+</details>
+
+> **Note:** This folder's script also enables Hubble Relay and Hubble UI on top of the
+> usual setup, so with the script the Helm upgrade of step 2 changes nothing. Running it
+> anyway is harmless. If policies from scenarios 4 or 5 are still in the cluster, delete
+> them first (`kubectl delete cnp --all -A`): this scenario observes traffic without any
+> policy.
+
+Wait until Cilium is ready:
+
+```bash
+cilium status --wait
+```
+
+Deploy the applications: nginx on `kind-worker2`, a client pod on `kind-worker`, and a
+`nginx-service` Service in front of nginx:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nginx
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nginx
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: kind-worker2
+      containers:
+        - name: nginx
+          image: nginx
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netshoot-client
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: kind-worker
+  containers:
+    - name: netshoot
+      image: nicolaka/netshoot
+      command: ["sleep", "infinity"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+spec:
+  selector:
+    app.kubernetes.io/name: nginx
+  ports:
+    - port: 80
+EOF
+```
+```bash
+kubectl wait --for=condition=Ready pod --all --timeout=120s
+```
+```bash
+kubectl get pods -o wide
+```
+
+The client runs on `kind-worker` and nginx on `kind-worker2`.
+
+## Step 2 — Enable Hubble Relay and Connect the CLI
+
+Cilium's eBPF programs already see every packet entering or leaving a pod. Hubble turns
+them into readable **flows**:
+
+| Component | Where it runs | Role |
+| --- | --- | --- |
+| Hubble server | inside every `cilium` agent | records the flows of its own node (on by default) |
+| Hubble Relay | `hubble-relay` Deployment | collects the flows of **all** nodes into one API |
+| `hubble` CLI | your terminal | reads the flows from Relay |
+
+Enable Hubble Relay with a Helm upgrade. `--reuse-values` keeps the settings from the
+installation and only adds Relay:
+
+```bash
+helm upgrade cilium cilium/cilium -n kube-system \
   --version 1.18.4 \
   --reuse-values \
-  --set hubble.relay.enabled=true \
-  --set hubble.ui.enabled=true
+  --set hubble.relay.enabled=true
+```
+```bash
+kubectl -n kube-system rollout status deployment/hubble-relay
+```
+```bash
+cilium status
 ```
 
-- `--reuse-values` keeps the values set at install time (tunnel mode, IPAM, ...). Without
-  it, Helm would reset them to the chart defaults.
-- `--version` keeps the installed Cilium version (1.18.4, from Scenario 1), so the
-  upgrade only changes Hubble.
+`cilium status` now shows `Hubble Relay: OK`.
 
-> **Note:** If you did not use the script, run the command above yourself (or
-> `cilium hubble enable --ui`, which does the same).
-
-Check that the new pods are running and Relay is healthy:
+The `hubble` CLI connects to Relay on `localhost:4245`. Open a port-forward to Relay. The
+`&` at the end keeps it running in the background, so you can keep using this terminal:
 
 ```bash
-$ kubectl -n kube-system rollout status deployment/hubble-relay
-$ kubectl -n kube-system rollout status deployment/hubble-ui
-$ cilium status
-    /¯¯\
- /¯¯\__/¯¯\    Cilium:             OK
- \__/¯¯\__/    Operator:           OK
- /¯¯\__/¯¯\    Envoy DaemonSet:    OK
- \__/¯¯\__/    Hubble Relay:       OK
-    \__/       ClusterMesh:        disabled
-[OUTPUT TRUNCATED]
+cilium hubble port-forward > /dev/null 2>&1 &
+```
+```bash
+sleep 3
+hubble status
 ```
 
-### Connect the Hubble CLI
-
-The `hubble` CLI talks to Relay. Open a port-forward to it in a **second terminal** and
-leave it running:
+`hubble status` shows `Healthcheck (via localhost:4245): Ok` and `Connected Nodes: 3/3`:
+Relay reaches the Hubble server on every node.
 
 ```bash
-$ cilium hubble port-forward
+hubble list nodes
 ```
 
-Back in the first terminal:
+Each node keeps its most recent flows in memory (4095 per node), so Hubble shows recent
+traffic, not a full history.
+
+> **Note:** If `hubble status` fails with `connect: connection refused`, the port-forward
+> is not running. Start it again with the `cilium hubble port-forward` command above.
+
+## Step 3 — Observe Pod-to-Pod and Pod-to-Service Traffic
+
+**Pod to pod.** Call nginx by its pod IP, then show the latest flows of the client pod:
 
 ```bash
-$ hubble status
-Healthcheck (via localhost:4245): Ok
-Current/Max Flows: 541/12,285 (4.40%)
-Flows/s: 6.68
-Connected Nodes: 3/3
+NGINX_IP=$(kubectl get pod -l app.kubernetes.io/name=nginx -o jsonpath='{.items[0].status.podIP}')
+kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" http://$NGINX_IP
 ```
-
 ```bash
-$ hubble list nodes
-NAME                           STATUS      AGE     FLOWS/S   CURRENT/MAX-FLOWS
-kind-kind/kind-control-plane   Connected   1m27s   3.94      373/4095 (  9.11%)
-kind-kind/kind-worker          Connected   53s     1.09      81/4095 (  1.98%)
-kind-kind/kind-worker2         Connected   59s     1.08      87/4095 (  2.12%)
+hubble observe --pod default/netshoot-client --last 10
 ```
 
-`Connected Nodes: 3/3` means Relay reaches the Hubble server on every node. Each node keeps
-its last 4095 flows in memory, so Hubble shows recent traffic, not a full history.
-
-> **Note:** If `hubble status` fails with
-> `dial tcp [::1]:4245: connect: connection refused`, the port-forward is not running.
-> Start `cilium hubble port-forward` again and leave its terminal open.
-
-### Hubble CLI: Through Relay or Inside a Cilium Pod
-
-The `cilium` agent image also ships a `hubble` binary, so you can run the CLI inside an
-agent pod without Relay or a port-forward:
-
-```bash
-$ kubectl -n kube-system exec ds/cilium -- hubble observe --last 5
-```
-
-| | Through Relay (port-forward) | Inside a `cilium` pod |
-| --- | --- | --- |
-| Talks to | Hubble Relay on `localhost:4245` | the local Hubble server of that one agent |
-| Flows you see | from **all** nodes | from **that node only** |
-| Needs | Relay enabled + `cilium hubble port-forward` | nothing extra |
-| `hubble list nodes` | works (3 nodes) | not available |
-
-This scenario uses **Relay**: the client and nginx run on different nodes, and Relay shows
-both sides of a connection in one stream. `ds/cilium` picks one agent pod for you, which
-may not be on the node you care about. Keep the in-pod method as a fallback for when Relay
-is down.
-
-## Deploy the Applications
-
-The same apps as in scenario 3: nginx on `kind-worker2`, the client on `kind-worker` and a
-`ClusterIP` Service in front of nginx.
-
-| File | Contents |
-| --- | --- |
-| [`app-nginx.yaml`](app-nginx.yaml) | `nginx-deployment`, pinned to `kind-worker2` |
-| [`app-netshoot.yaml`](app-netshoot.yaml) | `netshoot-client` pod, pinned to `kind-worker` |
-| [`svc-nginx.yaml`](svc-nginx.yaml) | `nginx-service`, ClusterIP on port 80 |
-
-```bash
-$ kubectl apply -f app-nginx.yaml -f app-netshoot.yaml -f svc-nginx.yaml
-$ kubectl wait --for=condition=Ready pod --all --timeout=120s
-$ kubectl get pods -o wide
-NAME                                READY   IP              NODE
-nginx-deployment-979f5455f-tjd2w    1/1     10.244.2.127    kind-worker2
-netshoot-client                     1/1     10.244.1.67     kind-worker
-```
-
-```
- kind-worker                                kind-worker2
-┌──────────────────┐                       ┌──────────────────┐
-│ netshoot-client  │── nginx-service:80 ─▶ │ nginx-deployment │
-│                  │   (ClusterIP)         │ pod :80          │
-└────────┬─────────┘                       └──────────────────┘
-         │ DNS :53                 internet :443
-         ▼                         ▲
-   kube-system/coredns             └── netshoot-client
-```
-
-> **Note:** Your pod names and IPs will differ. The flow outputs below are examples, so
-> read them for their shape, not their exact values.
-
-## Observe Pod-to-Pod Traffic
-
-In the first terminal, follow the flows of the client pod:
-
-```bash
-$ hubble observe --pod default/netshoot-client --follow
-```
-
-In a third terminal, call nginx by its **pod IP**:
-
-```bash
-$ NGINX_IP=$(kubectl get pod -l app.kubernetes.io/name=nginx -o jsonpath='{.items[0].status.podIP}')
-$ kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" http://$NGINX_IP
-200
-```
-
-One `curl` gives a full TCP conversation (names, ports and IDs differ in your cluster):
+One `curl` gives a full TCP conversation. The output looks like this (names, ports and
+IDs differ in your cluster):
 
 ```
 Oct 12 21:53:59.286: default/netshoot-client:38958 (ID:48603) -> default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-overlay FORWARDED (TCP Flags: SYN)
@@ -214,36 +218,32 @@ Oct 12 21:53:59.287: default/netshoot-client:38958 (ID:48603) <- default/nginx-d
 Oct 12 21:53:59.287: default/netshoot-client:38958 (ID:48603) <- default/nginx-deployment-6fdd9c87dd-4ts4d:80 (ID:30621) to-endpoint FORWARDED (TCP Flags: ACK, FIN)
 ```
 
-How to read a flow:
+How to read it:
 
 | Part | Meaning |
 | --- | --- |
-| `default/netshoot-client:38958` | namespace/pod and port. Hubble shows names, not only IPs |
+| `default/netshoot-client:38958` | namespace/pod and port: Hubble shows names, not only IPs |
 | `(ID:48603)` | the Cilium **security identity** of the pod, derived from its labels |
 | `->` / `<-` | request direction / reply direction |
-| `to-overlay` | the packet left the node through the VXLAN tunnel (the pods are on different nodes) |
+| `to-overlay` | the packet left the node through the VXLAN tunnel |
 | `to-endpoint` | the packet was delivered to the destination pod |
-| `FORWARDED` | the packet was allowed through. The other verdict you will meet is `DROPPED` |
+| `FORWARDED` | the packet was allowed. The other verdict is `DROPPED` |
 | `TCP Flags` | `SYN` → `SYN, ACK` → `ACK` is the handshake, `PSH` carries data, `FIN` closes it |
 
-Each node records only what it sees, which is why the same `SYN` shows up twice: once
-leaving `kind-worker` (`to-overlay`) and once arriving on `kind-worker2` (`to-endpoint`).
-Relay merges both nodes into one stream.
+The same `SYN` shows up twice: once leaving `kind-worker` (`to-overlay`) and once arriving
+on `kind-worker2` (`to-endpoint`). Each node records what it sees, and Relay merges them.
 
-> **Note:** Hubble shows that HTTP happened on port 80, but not the method, path or status
-> code. That level of detail needs an L7 policy (scenario 5), which sends the traffic
-> through Envoy. Without one, Hubble works at L3/L4.
-
-## Observe Pod-to-Service Traffic
-
-Keep `hubble observe` running and call nginx through the **Service name** this time:
+**Pod to Service.** Now call nginx through the **Service name**:
 
 ```bash
-$ kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" http://nginx-service
-200
+kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" http://nginx-service
+```
+```bash
+hubble observe --pod default/netshoot-client --last 20
 ```
 
-The new flows look like this:
+The output looks like this. The flows of the earlier pod-to-pod call also appear above
+these lines; they are left out here:
 
 ```
 Oct 12 21:58:27.585: default/netshoot-client:52192 (ID:48603) -> kube-system/coredns-559f6c778d-shp78:53 (ID:17890) to-endpoint FORWARDED (UDP)
@@ -270,130 +270,92 @@ Oct 12 21:58:28.628: default/netshoot-client (ID:48603) -> 10.96.0.10 (world) to
 
 Two things are new:
 
-**1. A DNS lookup.** The client first asks CoreDNS for the IP of `nginx-service` on port
-`53` (`UDP`). The client used the kube-dns Service IP (`10.96.0.10`), but the flows already
-show the CoreDNS **pods**.
-
-**2. The TCP flows go to the nginx pod, not to the ClusterIP.** As in scenario 3, Cilium
-translates the ClusterIP to a backend pod IP in eBPF, before the packet leaves the client.
-So the flows look exactly like the pod-to-pod ones above.
+1. **A DNS lookup** to a `kube-system/coredns-...` pod on port `53` (`UDP`): the client
+   first asks CoreDNS for the IP of `nginx-service`.
+2. **The TCP flows go to the nginx pod, not to the ClusterIP.** Cilium translates the
+   ClusterIP to a pod IP with eBPF before the packet leaves the client, so the flows look
+   exactly like the pod-to-pod ones.
 
 The last two lines are a late DNS reply: it arrives after `curl` has already closed its
 socket, so the client's kernel answers with an ICMP `DestinationUnreachable(Port)`. It is
 addressed to `10.96.0.10`, the ClusterIP of the `kube-dns` Service. A ClusterIP belongs to
 no pod and has no identity, so Hubble labels it `world`. It is harmless.
 
-To see which Service a flow went through, print it as JSON and look at
-`destination_service`:
+> **Note:** Hubble shows that traffic happened on port 80, but not the HTTP method, path
+> or status code. That level of detail needs an L7 policy, which sends the traffic through
+> Envoy. Without one, Hubble works at L3/L4.
 
-```bash
-$ hubble observe --pod default/netshoot-client --to-port 80 --last 1 -o json | jq '.flow.destination_service'
-{
-  "name": "nginx-service",
-  "namespace": "default"
-}
-```
+## Step 4 — Filter Flows, Traffic Leaving the Cluster and a Failed Connection
 
-## Filter the Flows
-
-`hubble observe` without filters prints the last 20 flows of the whole cluster, which is
-noisy. A few filters answer most questions:
+**Filters.** Without filters, `hubble observe` shows the flows of the whole cluster, which
+is noisy. A few filters answer most questions:
 
 ```bash
 # Who is calling nginx?
-$ hubble observe --to-pod default/nginx-deployment --last 20
-
+hubble observe --to-pod default/nginx-deployment --last 10
+```
+```bash
 # All DNS traffic in the cluster
-$ hubble observe --port 53 --last 20
-
+hubble observe --port 53 --last 10
+```
+```bash
 # Only what happens on one node
-$ hubble observe --node-name kind-worker2 --last 20
-
-# Only one namespace
-$ hubble observe --namespace default --last 20
+hubble observe --node-name kind-worker2 --last 10
 ```
 
-> **Note:** `--to-pod default/nginx-deployment` matches every pod whose name **starts
-> with** `nginx-deployment`, so you don't need the random suffix.
+`--to-pod default/nginx-deployment` matches every pod whose name **starts with**
+`nginx-deployment`, so you don't need the random suffix.
 
 > **Note:** To see which node recorded each flow, add `--print-node-name` to any
 > `hubble observe` command. Each line then also shows the node name, for example
 > `kind-kind/kind-worker2`.
 
-### Traffic leaving the cluster
-
-Call a site on the internet:
-
-```bash
-$ kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" https://example.com
-200
-```
-
-Everything outside the cluster has the reserved identity `world`. Filter on it:
+**Traffic leaving the cluster.** Call a site on the internet, then filter on `world`, the
+identity Cilium gives to everything outside the cluster:
 
 ```bash
-$ hubble observe --pod default/netshoot-client --to-label reserved:world --last 10
-Oct  9 10:18:40.551: default/netshoot-client:39880 (ID:28634) -> 23.192.228.80:443 (world) to-stack FORWARDED (TCP Flags: SYN)
-Oct  9 10:18:40.589: default/netshoot-client:39880 (ID:28634) -> 23.192.228.80:443 (world) to-stack FORWARDED (TCP Flags: ACK)
-[OUTPUT TRUNCATED]
+kubectl exec pod/netshoot-client -- curl -s -o /dev/null -w "%{http_code}\n" https://example.com
+```
+```bash
+hubble observe --pod default/netshoot-client --to-label reserved:world --last 10
 ```
 
-- The destination is only an IP. Hubble can show the name `example.com` only when DNS
-  goes through a DNS-aware policy, as in scenario 5.
+- The destination is shown as an IP followed by `(world)`.
 - `to-stack` means the packet was handed to the node's network stack, which sends it out
-  of the cluster (masqueraded to the node IP).
+  of the cluster.
 
-## Observe a Failed Connection
-
-Not every failure is a policy drop. Call nginx on a port where nothing listens:
-
-```bash
-$ kubectl exec pod/netshoot-client -- curl -s -m 3 http://$NGINX_IP:8081
-command terminated with exit code 7
-```
+**A failed connection.** Not every failure is a network problem. Call nginx on port 8081,
+where nothing listens:
 
 ```bash
-$ hubble observe --port 8081 --last 10
-Oct  9 10:20:05.712: default/netshoot-client:58214 (ID:28634) -> default/nginx-deployment-979f5455f-tjd2w:8081 (ID:4512) to-overlay FORWARDED (TCP Flags: SYN)
-Oct  9 10:20:05.713: default/netshoot-client:58214 (ID:28634) <- default/nginx-deployment-979f5455f-tjd2w:8081 (ID:4512) to-overlay FORWARDED (TCP Flags: ACK, RST)
+NGINX_IP=$(kubectl get pod -l app.kubernetes.io/name=nginx -o jsonpath='{.items[0].status.podIP}')
+kubectl exec pod/netshoot-client -- curl -s -m 3 http://$NGINX_IP:8081
 ```
-
-The network delivered the `SYN` (`FORWARDED`), and the nginx pod answered with `RST`:
-"nothing is listening on this port". This is an application or configuration problem,
-not a network one. A policy drop would look different: a `DROPPED` verdict and no reply.
-
-## Hubble UI
-
-Open the UI. The command opens a port-forward on `localhost:12000` and your browser:
-
 ```bash
-$ cilium hubble ui
-ℹ️  Opening "http://localhost:12000" in your browser...
+hubble observe --port 8081 --last 10
 ```
 
-1. Select the `default` namespace at the top.
-2. In another terminal, generate some traffic:
+`curl` fails with `exit code 7`. In Hubble:
 
-   ```bash
-   for i in $(seq 1 10); do
-     kubectl exec pod/netshoot-client -- curl -s -o /dev/null http://nginx-service
-     kubectl exec pod/netshoot-client -- curl -s -o /dev/null https://example.com
-     sleep 1
-   done
-   ```
+- the `SYN` was `FORWARDED`: the network delivered it to the nginx pod;
+- the pod answered with `TCP Flags: ACK, RST`: "nothing is listening on this port".
 
-3. Watch the service map draw `netshoot-client → nginx-deployment`,
-   `netshoot-client → kube-dns` and `netshoot-client → world`. The table under the map
-   lists the same flows as `hubble observe`.
+This is an application or configuration problem, not a network one. A policy drop would
+look different: a `DROPPED` verdict and no reply.
 
-Click a box or an arrow to filter the table to that workload.
+> **Note:** `--pod` and `--port` together match only when the pod **and** the port are on
+> the same side of the flow. The client uses a random port and nginx owns port 8081, so
+> `--pod default/netshoot-client --port 8081` shows nothing. Filter on the port alone.
 
 ## Cleanup
 
-Stop the port-forwards (`Ctrl+C` in their terminals) and remove the test applications:
+Stop the background port-forward and remove the test applications:
 
 ```bash
-kubectl delete -f svc-nginx.yaml -f app-nginx.yaml -f app-netshoot.yaml
+kill %1   # or: pkill -f "cilium hubble port-forward"
+kubectl delete service nginx-service
+kubectl delete deployment nginx-deployment
+kubectl delete pod netshoot-client
 ```
 
 If you are done with the lab, delete the cluster too (no need for BB):

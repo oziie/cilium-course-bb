@@ -4,52 +4,35 @@
 check which PodCIDR each node receives, and fill up one node until its pods can no longer
 get an IP address.
 
-## What is Cluster Scope IPAM?
+## Step 1 — Create the Cluster with Cluster Scope IPAM
 
-IPAM (IP Address Management) decides which IP address every pod gets. Until now the lab
-used `ipam.mode=kubernetes` (Kubernetes Host Scope): Kubernetes gives each node a
-PodCIDR, and Cilium hands out pod IPs from it.
+**IPAM** (IP Address Management) decides which IP address each pod gets. In
+**Cluster Scope** mode (`ipam.mode=cluster-pool`), **Cilium, not Kubernetes**, gives each
+node its pod address range (PodCIDR). The Cilium operator splits one or more cluster-wide
+pools into per-node subnets. It is Cilium's **default** IPAM mode, because it needs no
+special Kubernetes configuration. Its advantage is that the cluster can have **several**
+pools instead of one. But if the pools are too small, pods still run out of addresses.
+This scenario simulates exactly that.
 
-In **Cluster Scope** mode (`ipam.mode=cluster-pool`), **Cilium, not Kubernetes,**
-allocates the PodCIDRs to the nodes. The Cilium operator splits one or more cluster-wide
-pools into per-node subnets and writes them to each node's `CiliumNode` resource. The
-Cilium agent on the node then hands out pod IPs from that subnet.
-
-| | Kubernetes Host Scope | Cluster Scope |
-| --- | --- | --- |
-| `ipam.mode` | `kubernetes` | `cluster-pool` |
-| Who assigns the node PodCIDR | Kubernetes (kube-controller-manager) | Cilium operator |
-| Where the node PodCIDR is stored | `Node` `.spec.podCIDR` | `CiliumNode` `.spec.ipam.podCIDRs` |
-| Cluster-wide pools | one | one or more |
-
-Cluster Scope needs no specific Kubernetes configuration, so it is Cilium's **default**
-IPAM mode. Without extra settings, Cilium uses the cluster-wide `10.0.0.0/8` prefix and
-gives every `CiliumNode` a `/24` subnet.
-
-Its advantage over Kubernetes Host Scope is that the cluster can have **several** CIDRs
-instead of just one. That is more flexible, but it does not solve IP address exhaustion
-if the pools were too small to begin with. This scenario simulates exactly that.
-
-## Delete the Previous Cluster (mandatory, BB included)
-
-The IPAM mode is set when Cilium is installed and cannot be changed on a running
-cluster. The cluster from the previous scenarios uses `ipam.mode=kubernetes`, and this
-scenario needs `ipam.mode=cluster-pool`. **Deleting the cluster is mandatory in every
-environment, BB included:**
+**If exists, delete any previous cluster first (mandatory).** The IPAM mode is set when
+Cilium is installed and **cannot be changed on a running cluster**. If a cluster from an
+earlier scenario exists, it uses `ipam.mode=kubernetes`, so delete it, then create the
+new cluster with the [`create-kind-cluster.sh`](create-kind-cluster.sh) script in this
+folder:
 
 ```bash
 cd scenario-7-cluster-scope-ipam
 ./create-kind-cluster.sh --delete   # or: kind delete cluster --name kind
+./create-kind-cluster.sh
+kubectl config current-context      # should print kind-kind
 ```
 
-> **Note:** If you skip this step, the script stops with
+> **Note:** If you skip the deletion, the script stops with
 > `Cilium is installed with ipam 'kubernetes', not cluster-pool — re-run with --recreate.`
 
-## Cilium Configuration
-
-Cilium starts with the values in [`cilium-values.yaml`](cilium-values.yaml). Apart from
-IPAM, they are the same settings as in
-[Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md):
+The script creates the cluster from [`light-lab.yaml`](light-lab.yaml) and installs
+Cilium with the values in [`cilium-values.yaml`](cilium-values.yaml). Apart from `ipam`,
+they are the usual lab settings:
 
 ```yaml
 operator:
@@ -67,84 +50,132 @@ ipam:
 
 - `clusterPoolIPv4PodCIDRList`: two small `/28` pools (16 addresses each) for the whole
   cluster.
-- `clusterPoolIPv4MaskSize: 29`: every node receives a `/29` (8 addresses) from one of
-  the pools.
+- `clusterPoolIPv4MaskSize: 29`: each node receives a `/29` (8 addresses) from one of the
+  pools.
 
-A `/29` has 8 addresses. The network and broadcast addresses are not used, which leaves
-**6 allocatable addresses** per node. Two of them go to Cilium's own `cilium_host` (router)
-and `cilium-health` interfaces, so **only 4 are left for pods** on each node.
-
-> **Note:** These are Cilium Helm values, not kind settings. The kind config
-> [`light-lab.yaml`](light-lab.yaml) is the same as in the other scenarios; a comment in
-> it points to `cilium-values.yaml`.
-
-## Create the Cluster and Install Cilium (mandatory, BB included)
-
-After the deletion there is no cluster left, so this step is mandatory too:
+<details>
+<summary>Manual alternative (the commands used on BB)</summary>
 
 ```bash
-./create-kind-cluster.sh
-kubectl config current-context   # should print kind-kind
+kind delete cluster --name kind
 ```
-
-The script creates the cluster from `light-lab.yaml`, then installs Cilium with the
-values above. It is the same as running:
-
 ```bash
-helm upgrade --install cilium cilium --repo https://helm.cilium.io/ -n kube-system \
+cat > light-lab.yaml <<EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+networking:
+  disableDefaultCNI: true
+EOF
+```
+```bash
+kind create cluster --config light-lab.yaml
+```
+```bash
+cat > cilium-values.yaml <<EOF
+operator:
+  replicas: 1
+routingMode: tunnel
+tunnelProtocol: vxlan
+ipam:
+  mode: cluster-pool
+  operator:
+    clusterPoolIPv4MaskSize: 29
+    clusterPoolIPv4PodCIDRList:
+      - 10.0.42.0/28
+      - 10.0.84.0/28
+EOF
+```
+```bash
+helm repo add cilium https://helm.cilium.io/
+```
+```bash
+helm install cilium cilium/cilium -n kube-system \
   --version 1.18.4 \
   --set cluster.name=kind-kind \
   -f cilium-values.yaml
 ```
 
-Check that Cilium is running in Cluster Scope mode with the Cilium CLI:
+</details>
+
+Wait until Cilium is ready:
 
 ```bash
-$ cilium config view | grep cluster-pool
-cluster-pool-ipv4-cidr                            10.0.42.0/28 10.0.84.0/28
-cluster-pool-ipv4-mask-size                       29
-ipam                                              cluster-pool
+cilium status --wait
 ```
 
-## Check the Node Subnets
-
-The operator writes each node's subnet to its `CiliumNode` resource:
+Check that Cilium runs in Cluster Scope mode:
 
 ```bash
-$ kubectl get ciliumnode -o custom-columns=NODE:.metadata.name,CIDR:.spec.ipam.podCIDRs[0]
+cilium config view | grep cluster-pool
+```
+
+You see `ipam cluster-pool`, the two pools in `cluster-pool-ipv4-cidr` and the mask size
+`29`.
+
+## Step 2 — Check the Subnet of Each Node
+
+The Cilium operator writes each node's subnet into the node's `CiliumNode` resource:
+
+```bash
+kubectl get ciliumnode -o custom-columns=NODE:.metadata.name,CIDR:.spec.ipam.podCIDRs[0]
+```
+
+Example output (your assignment may differ):
+
+```
 NODE                 CIDR
 kind-control-plane   10.0.42.8/29
 kind-worker          10.0.42.0/29
 kind-worker2         10.0.84.8/29
 ```
 
-A `/28` only holds two `/29` subnets, so the first pool runs out after two nodes and the
-third node receives its subnet from the second pool.
+A `/28` holds only two `/29` subnets. The first pool (`10.0.42.0/28`) runs out after two
+nodes, so the third node receives its subnet from the second pool (`10.0.84.0/28`).
 
-> **Note:** Which node gets which subnet can differ in your cluster. The outputs in this
-> scenario are examples, so read them for their shape, not their exact values.
+**How many pods fit on a node?** A `/29` has 8 addresses:
 
-## Deploy a Sample Pod
+| Addresses | Used for |
+| --- | --- |
+| 2 | network and broadcast address, never used |
+| 1 | `cilium_host`, Cilium's router interface on the node |
+| 1 | `cilium-health`, Cilium's health-check endpoint |
+| **4** | **pods** |
 
-Deploy the [`netshoot-client-pod.yaml`](netshoot-client-pod.yaml) pod, pinned to
-`kind-worker`:
+Cilium counts **6 allocatable** addresses per node (8 minus network and broadcast), but
+only **4 are left for pods**.
+
+## Step 3 — Deploy a Sample Pod and Check the Node's Addresses
+
+Deploy a pod on `kind-worker`:
 
 ```bash
-$ kubectl apply -f netshoot-client-pod.yaml
-$ kubectl wait --for=condition=Ready pod/netshoot-client --timeout=120s
-$ kubectl get pod netshoot-client -o wide
-NAME              READY   STATUS    IP          NODE
-netshoot-client   1/1     Running   10.0.42.5   kind-worker
+kubectl run netshoot-client --image=nicolaka/netshoot \
+  --overrides='{"spec":{"nodeSelector":{"kubernetes.io/hostname":"kind-worker"}}}' \
+  -- sleep infinity
+```
+```bash
+kubectl wait --for=condition=Ready pod/netshoot-client --timeout=120s
+```
+```bash
+kubectl get pod netshoot-client -o wide
 ```
 
-The pod IP comes from the `/29` of `kind-worker`. Now look at the IPAM section of
-`cilium-dbg status` on the Cilium agent of that node:
+The pod IP comes from the `/29` of `kind-worker` that you saw in step 2.
+
+Now look at the IPAM section of `cilium-dbg status` on the Cilium agent of that node:
 
 ```bash
-$ CILIUM_POD=$(kubectl -n kube-system get pod -l k8s-app=cilium \
-    --field-selector spec.nodeName=kind-worker -o name)
-$ kubectl -n kube-system exec $CILIUM_POD -c cilium-agent -- \
-    cilium-dbg status --verbose | grep -A 4 '^IPAM'
+CILIUM_POD=$(kubectl -n kube-system get pod -l k8s-app=cilium --field-selector spec.nodeName=kind-worker -o name)
+kubectl -n kube-system exec $CILIUM_POD -c cilium-agent -- cilium-dbg status --verbose | grep -A 6 '^IPAM'
+```
+
+Example output:
+
+```
 IPAM:                    IPv4: 3/6 allocated from 10.0.42.0/29,
 Allocated addresses:
   10.0.42.1 (router)
@@ -153,53 +184,66 @@ Allocated addresses:
 ```
 
 `3/6` means 3 of the 6 allocatable addresses are in use: the router (`cilium_host`), the
-health endpoint and the pod.
+health endpoint and your pod. If `coredns` pods run on this node, they are listed too.
 
-> **Note:** If `coredns` pods were scheduled on this node, they appear in the list too.
+## Step 4 — Run Out of Addresses on a Node
 
-## Exhaust the Node's Addresses
-
-Create a Deployment with 10 nginx pods, all pinned to `kind-worker2`, from
-[`nginx-deployment-10-replicas.yaml`](nginx-deployment-10-replicas.yaml):
+Create a Deployment with **10** nginx pods, all pinned to `kind-worker2`:
 
 ```bash
-$ kubectl apply -f nginx-deployment-10-replicas.yaml
-$ kubectl get pods -o wide -l app.kubernetes.io/name=nginx
-NAME                                READY   STATUS              IP          NODE
-nginx-deployment-5d9c7b8f6b-2xkqp   1/1     Running             10.0.84.11  kind-worker2
-nginx-deployment-5d9c7b8f6b-7hzlm   1/1     Running             10.0.84.13  kind-worker2
-nginx-deployment-5d9c7b8f6b-9wq4r   1/1     Running             10.0.84.10  kind-worker2
-nginx-deployment-5d9c7b8f6b-c8vnt   1/1     Running             10.0.84.14  kind-worker2
-nginx-deployment-5d9c7b8f6b-fj2mx   0/1     ContainerCreating   <none>      kind-worker2
-nginx-deployment-5d9c7b8f6b-k4tzd   0/1     ContainerCreating   <none>      kind-worker2
-...
+kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nginx
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nginx
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: kind-worker2
+      containers:
+        - name: nginx
+          image: nginx
+EOF
 ```
 
-At most 4 pods are `Running`, fewer if `coredns` already uses addresses on `kind-worker2`.
-The rest stay in `ContainerCreating` because they have no IP address. Check the
-Cilium agent on `kind-worker2`:
+Wait about 30 seconds, then list the pods:
 
 ```bash
-$ CILIUM_POD=$(kubectl -n kube-system get pod -l k8s-app=cilium \
-    --field-selector spec.nodeName=kind-worker2 -o name)
-$ kubectl -n kube-system exec $CILIUM_POD -c cilium-agent -- cilium-dbg status | grep IPAM
-IPAM:                    IPv4: 6/6 allocated from 10.0.84.8/29,
+kubectl get pods -o wide -l app.kubernetes.io/name=nginx
 ```
 
-All available addresses are allocated. The events of a stuck pod show the same reason
-(look for `range is full`):
+At most **4** pods are `Running` (fewer if `coredns` already uses addresses on
+`kind-worker2`). The others stay in `ContainerCreating`, with no IP: the node has no
+address left to give them.
+
+Confirm it on the Cilium agent of `kind-worker2`:
 
 ```bash
-kubectl describe pod <a-ContainerCreating-pod> | tail -5
+CILIUM_POD=$(kubectl -n kube-system get pod -l k8s-app=cilium --field-selector spec.nodeName=kind-worker2 -o name)
+kubectl -n kube-system exec $CILIUM_POD -c cilium-agent -- cilium-dbg status | grep IPAM
 ```
 
-## Limitations of Cluster Scope
+The output shows `IPv4: 6/6 allocated`: every address is in use. The events of the stuck
+pods tell the same story. Kubernetes could not create the pod's network because Cilium
+had no IP left to allocate:
 
-Cluster Scope is more flexible than Kubernetes Host Scope, but it still has important
-limitations:
+```bash
+STUCK_POD=$(kubectl get pods -l app.kubernetes.io/name=nginx --field-selector status.phase=Pending -o name | head -n 1)
+kubectl describe $STUCK_POD | grep -m 1 "range is full"
+```
 
-- **The address space is static.** You cannot add or expand PodCIDRs once the cluster is
-  running, so IP exhaustion like the one above cannot be fixed without redeploying.
+**Limitations of Cluster Scope.** It is more flexible than Kubernetes Host Scope, but:
+
+- **The address space is static.** You cannot add or expand the pools once the cluster is
+  running, so an exhaustion like this one cannot be fixed without redeploying.
 - **Limited control over pod IPs.** All pods draw from the same shared pools, whatever
   their workload or namespace.
 
@@ -210,7 +254,8 @@ Multi-Pool IPAM mode removes these restrictions.
 Remove the test applications:
 
 ```bash
-kubectl delete -f nginx-deployment-10-replicas.yaml -f netshoot-client-pod.yaml
+kubectl delete deployment nginx-deployment
+kubectl delete pod netshoot-client
 ```
 
 This cluster uses `ipam.mode=cluster-pool`, while the other scenarios use different

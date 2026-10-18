@@ -2,41 +2,13 @@
 
 **Scope:** Go beyond IPs and ports. Allow only specific HTTP methods and paths into the
 API, require a header for a sensitive call, and limit the frontend's internet access to a
-single domain name. Same shop and namespaces as scenario 4.
+single domain name.
 
-## Prepare the kind cluster (no need for BB)
+## Step 1 — Create the Cluster and Install Cilium
 
-This scenario runs on the same cluster as the previous ones: 1 control-plane + 2 workers
-with Cilium installed. If you are continuing from the previous scenario, skip this section.
-
-Otherwise, create (or reuse) the cluster with the script in this folder:
-
-```bash
-cd scenario-5-cilium-network-policies-layer7
-./create-kind-cluster.sh
-kubectl config current-context   # should print kind-kind
-```
-
-The script creates the cluster, installs Cilium with the same settings as
-[Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md) and waits until
-all nodes are `Ready`. If Cilium is already installed, it is left as is. Check it with:
-
-```bash
-cilium status
-```
-
-L7 policies are enforced by Envoy. The Scenario 1 install already runs it as the
-`cilium-envoy` DaemonSet, so there is nothing extra to enable:
-
-```bash
-kubectl get -n kube-system daemonset cilium-envoy
-```
-
-## The Use Case
-
-In scenario 4 the frontend could call the API on port 8080, and that was it: any method,
-any path. Now the API serves a public catalog, an orders endpoint and an internal admin
-page **on the same port**. An L4 rule cannot tell them apart, an L7 rule can.
+In this scenario you go beyond IPs and ports: you allow only specific **HTTP methods and
+paths** into an API, require a **header** for a sensitive call, and limit a pod's
+internet access to a single **domain name**.
 
 ```
  ns: frontend           ns: backend                       ns: database
@@ -55,89 +27,193 @@ page **on the same port**. An L4 rule cannot tell them apart, an L7 rule can.
 └─────────────┘
 ```
 
-| File | Contents |
-| --- | --- |
-| [`namespaces.yaml`](namespaces.yaml) | `frontend`, `backend`, `database` namespaces (same as scenario 4) |
-| [`app-api.yaml`](app-api.yaml) | nginx `api` on 8080 with `/api/products`, `/api/orders` and `/admin` |
-| [`app-redis.yaml`](app-redis.yaml) | `redis` Deployment + Service on 6379 (same as scenario 4) |
-| [`app-clients.yaml`](app-clients.yaml) | `web` pod in `frontend`, `intruder` pod in `default` (same as scenario 4) |
-| [`cnp-00-baseline.yaml`](cnp-00-baseline.yaml) | Scenario 4 baseline: default deny ingress + `api` → `redis` |
-| [`cnp-01-api-http.yaml`](cnp-01-api-http.yaml) | `web` → `api`: only `GET /api/products`, `GET` and `POST /api/orders` |
-| [`cnp-02-api-http-header.yaml`](cnp-02-api-http-header.yaml) | Same, plus `DELETE /api/orders/<id>` with header `X-Team: ops` |
-| [`cnp-03-web-egress-fqdn.yaml`](cnp-03-web-egress-fqdn.yaml) | `web` egress: DNS, `api:8080` and `api.github.com:443` only |
+First, build the lab cluster: 1 control-plane and 2 worker nodes, with Cilium as the
+network plugin (CNI).
 
-## Deploy the Applications
-
-If scenario 4 is still deployed, clean it up first (see its Cleanup section). Then:
+This scenario runs on the same cluster as the previous ones: 1 control-plane + 2 workers
+with Cilium installed. If you are continuing from the previous scenario, the cluster is
+already there. Otherwise, create (or reuse) it with the
+[`create-kind-cluster.sh`](create-kind-cluster.sh) script in this folder:
 
 ```bash
 cd scenario-5-cilium-network-policies-layer7
-
-kubectl apply -f namespaces.yaml
-kubectl apply -f app-api.yaml -f app-redis.yaml -f app-clients.yaml
-
-kubectl wait --for=condition=Ready pod --all -n backend  --timeout=120s
-kubectl wait --for=condition=Ready pod --all -n database --timeout=120s
-kubectl wait --for=condition=Ready pod/web -n frontend   --timeout=120s
-kubectl wait --for=condition=Ready pod/intruder -n default --timeout=120s
+./create-kind-cluster.sh
+kubectl config current-context   # should print kind-kind
 ```
 
-## How to Read the Results
+The script creates the cluster from [`light-lab.yaml`](light-lab.yaml), installs Cilium
+with the same settings as
+[Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md) and waits until
+all nodes are `Ready`. If Cilium is already installed, it is left as is.
 
-In scenario 4 a blocked connection was **dropped**, so the client timed out. With L7
-rules the TCP connection is accepted and Envoy reads the request. If no rule matches, Envoy
-answers **`403 Forbidden`** with the body `Access denied`.
+<details>
+<summary>Manual alternative (the commands used on BB)</summary>
 
-So the output of each command tells you what happened:
+Write the kind configuration file and create the cluster. `disableDefaultCNI: true` turns
+off kind's default network plugin so that Cilium can manage pod networking:
 
-| You see | Meaning |
+```bash
+cat > light-lab.yaml <<EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+networking:
+  disableDefaultCNI: true
+EOF
+```
+```bash
+kind create cluster --config light-lab.yaml
+```
+
+Install Cilium with Helm:
+
+```bash
+helm repo add cilium https://helm.cilium.io/
+```
+```bash
+helm install cilium cilium/cilium -n kube-system \
+  --version 1.18.4 \
+  --set cluster.name=kind-kind \
+  --set ipam.mode=kubernetes \
+  --set operator.replicas=1 \
+  --set routingMode=tunnel \
+  --set tunnelProtocol=vxlan
+```
+
+</details>
+
+> **Note:** If the namespaces and policies of scenario 4 are still in the cluster, remove
+> them first (see the Cleanup section of scenario 4).
+
+Wait until Cilium is ready:
+
+```bash
+cilium status --wait
+```
+```bash
+kubectl get nodes
+```
+
+Layer 7 (L7) policies are enforced by the **Envoy** proxy. Cilium already runs it on every
+node as the `cilium-envoy` DaemonSet, so there is nothing extra to enable:
+
+```bash
+kubectl get -n kube-system daemonset cilium-envoy
+```
+
+The DaemonSet shows `3` ready pods, one per node.
+
+## Step 2 — Deploy the API and Deny All Ingress
+
+The `api` in the `backend` namespace serves several routes **on the same port 8080**:
+
+| Request | Answer |
 | --- | --- |
-| JSON from the API | Allowed, answered by nginx |
-| `Access denied` | Denied by an **L7** rule (Envoy answered, nginx never saw the request) |
-| `command terminated with exit code 28` | Timeout: dropped at **L3/L4**, as in scenario 4 |
+| `GET /api/products` | the product list |
+| `GET`, `POST`, `DELETE /api/orders...` | the orders service |
+| `GET /admin` | an internal admin page |
 
-## Baseline: Everything Can Reach Everything
+An L3/L4 rule (IP and port) cannot tell these routes apart. An L7 rule can.
+
+Two client pods call it: `web` in `frontend` (the shop frontend) and `intruder` in
+`default` (should be blocked everywhere).
 
 ```bash
-# GET the product list
-kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/api/products
+kubectl create namespace frontend
+```
+```bash
+kubectl create namespace backend
+```
+```bash
+kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: api-nginx-conf, namespace: backend}
+data:
+  default.conf: |
+    server {
+      listen 8080;
+      default_type application/json;
+      location /api/products { return 200 '{"products":["socks","mug","sticker"]}\n'; }
+      location /api/orders   { return 200 '{"service":"orders","method":"$request_method"}\n'; }
+      location /admin        { return 200 '{"admin":"internal settings"}\n'; }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: api, namespace: backend}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: api}}
+  template:
+    metadata: {labels: {app.kubernetes.io/name: api}}
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          volumeMounts: [{name: conf, mountPath: /etc/nginx/conf.d}]
+      volumes: [{name: conf, configMap: {name: api-nginx-conf}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: api, namespace: backend}
+spec:
+  selector: {app.kubernetes.io/name: api}
+  ports: [{port: 8080}]
+EOF
+```
+```bash
+kubectl run web -n frontend --image=nicolaka/netshoot -l app.kubernetes.io/name=web -- sleep infinity
+```
+```bash
+kubectl run intruder -n default --image=nicolaka/netshoot -l app.kubernetes.io/name=intruder -- sleep infinity
+```
+```bash
+kubectl wait --for=condition=Ready pod --all -A --timeout=180s
+```
 
-# DELETE an order
+**Baseline.** Without any policy, everything is allowed. Even deleting an order and
+reading the admin page work:
+
+```bash
 kubectl exec -n frontend web -- curl -s --max-time 3 -X DELETE http://api.backend:8080/api/orders/42
-
-# Read the admin page
+```
+```bash
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/admin
-
-# The intruder calls the API
-kubectl exec -n default intruder -- curl -s --max-time 3 http://api.backend:8080/api/products
 ```
 
-Every command returns JSON from the API, including deleting orders and reading the admin
-page.
+Both return JSON from the API.
 
-## Step 1 — L3/L4 Baseline from Scenario 4
-
-Apply the default deny and the `api` → `redis` rule you built in scenario 4:
+**Default deny.** As in the L3/L4 scenario, deny all ingress into `backend`:
 
 ```bash
-kubectl apply -f cnp-00-baseline.yaml
-kubectl get cnp -A
+kubectl apply -f - <<EOF
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: backend
+spec:
+  endpointSelector: {}
+  ingress:
+    - {}
+EOF
 ```
-
 ```bash
-# expected: command terminated with exit code 28 (dropped)
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/api/products
 ```
 
-Nothing reaches the API yet. Redis stays reachable from the API only, as in scenario 4.
+The last command ends with `command terminated with exit code 28`: a **timeout**. The
+packets were dropped at L3/L4, so nothing reaches the API yet.
 
-> **Note:** Cilium has no L7 parser for the Redis protocol, so `api` → `redis` stays an
-> L4 rule. L7 rules are available for HTTP (including gRPC), Kafka and DNS.
+## Step 3 — Allow Only Specific HTTP Calls
 
-## Step 2 — Allow Only Specific HTTP Calls
+Allow `web` to call the API on port 8080, but only with these requests:
 
-```yaml
-# cnp-01-api-http.yaml
+```bash
+kubectl apply -f - <<EOF
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -160,81 +236,69 @@ spec:
             http:
               - method: GET
                 path: "/api/products"
-              - method: GET
-                path: "/api/orders"
               - method: POST
                 path: "/api/orders"
-```
-
-- The L3/L4 part (`fromEndpoints` + `ports`) is the same as scenario 4.
-- `rules.http` is new. Each entry is one allowed request shape. A request must match
-  **at least one** entry. Anything else on this port gets `Access denied`.
-- `method` and `path` are **regular expressions** that must match the whole value.
-  `/api/products` does not match `/api/products/1`. Use `/api/products(/.*)?` for that.
-
-```bash
-kubectl apply -f cnp-01-api-http.yaml
-
-# GET /api/products   expected: product list
-kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/api/products
-
-# POST /api/orders   expected: {"service":"orders","method":"POST",...}
-kubectl exec -n frontend web -- curl -s --max-time 3 -X POST http://api.backend:8080/api/orders
-
-# DELETE /api/orders/42   expected: Access denied (method not allowed)
-kubectl exec -n frontend web -- curl -s --max-time 3 -X DELETE http://api.backend:8080/api/orders/42
-
-# GET /admin   expected: Access denied (path not allowed)
-kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/admin
-
-# intruder   expected: command terminated with exit code 28 (dropped at L3)
-kubectl exec -n default intruder -- curl -s --max-time 3 http://api.backend:8080/api/products
-```
-
-> **Note:** The `intruder` still times out instead of getting `Access denied`. It fails
-> the L3 check (`fromEndpoints`), so its packets are dropped before they reach Envoy.
-
-## Step 3 — Require a Header for Sensitive Calls
-
-Support staff use the frontend to cancel orders. Deleting must stay possible, but only
-for requests tagged by the ops tooling with `X-Team: ops`.
-
-```yaml
-# cnp-02-api-http-header.yaml (only the added rule is shown)
               - method: DELETE
                 path: "/api/orders/[0-9]+"
                 headers:
                   - "X-Team: ops"
+EOF
 ```
 
-A rule matches only when **all** its fields match: method, path and every listed header.
+- The L3/L4 part (`fromEndpoints` + `ports`) works as in the L3/L4 scenario.
+- `rules.http` is new: each entry is one allowed request. A request must match **at least
+  one** entry, otherwise Envoy rejects it.
+- `method` and `path` are **regular expressions** matched against the whole value.
+  `/api/orders/[0-9]+` matches `/api/orders/42`.
+- The `DELETE` rule also needs the header `X-Team: ops`. A rule matches only when **all**
+  its fields match.
+
+**How to read the results.** With L7 rules, Envoy reads each request:
+
+| You see | Meaning |
+| --- | --- |
+| JSON from the API | allowed |
+| `Access denied` | denied by an **L7** rule: Envoy answered `403`, nginx never saw the request |
+| `exit code 28` (timeout) | dropped at **L3/L4** |
+
+Test it:
 
 ```bash
-kubectl apply -f cnp-02-api-http-header.yaml   # same name, replaces cnp-01
-
-
-# Without the header   expected: Access denied
+# Allowed: GET /api/products
+kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/api/products
+```
+```bash
+# Allowed: POST /api/orders
+kubectl exec -n frontend web -- curl -s --max-time 3 -X POST http://api.backend:8080/api/orders
+```
+```bash
+# Access denied: path /admin is not in the rules
+kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/admin
+```
+```bash
+# Access denied: DELETE without the header
 kubectl exec -n frontend web -- curl -s --max-time 3 -X DELETE http://api.backend:8080/api/orders/42
-
-# With the header   expected: {"service":"orders","method":"DELETE",...}
+```
+```bash
+# Allowed: DELETE with the header
 kubectl exec -n frontend web -- curl -s --max-time 3 -X DELETE -H 'X-Team: ops' http://api.backend:8080/api/orders/42
-
-# Wrong header value   expected: Access denied
-kubectl exec -n frontend web -- curl -s --max-time 3 -X DELETE -H 'X-Team: dev' http://api.backend:8080/api/orders/42
+```
+```bash
+# Timeout (exit code 28): the intruder fails the L3 check, before Envoy
+kubectl exec -n default intruder -- curl -s --max-time 3 http://api.backend:8080/api/products
 ```
 
-> **Note:** A header is not authentication: any client allowed at L3 can set it. In real
-> life you would match on something the client cannot forge, or combine this with
-> mutual authentication. Here it shows how fine-grained an L7 rule can be.
+> **Note:** A header is not authentication: any client allowed at L3 can set it. It shows
+> how precise an L7 rule can be.
 
-## Step 4 — Limit the Frontend's Egress by Domain Name
+## Step 4 — Limit Internet Access by Domain Name
 
 The frontend needs one external service, `api.github.com`, and nothing else on the
-internet. Its IPs change all the time, so an IP-based (`toCIDR`) rule would break.
-`toFQDNs` allows traffic by **name**.
+internet. Its IPs change all the time, so an IP-based rule would break. A `toFQDNs` rule
+allows traffic by **name**:
 
-```yaml
-# cnp-03-web-egress-fqdn.yaml
+```bash
+kubectl apply -f - <<EOF
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -252,9 +316,7 @@ spec:
       toPorts:
         - ports:
             - port: "53"
-              protocol: UDP
-            - port: "53"
-              protocol: TCP
+              protocol: ANY
           rules:
             dns:
               - matchPattern: "*"
@@ -272,92 +334,57 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+EOF
 ```
 
-How it works:
+The policy has three egress rules:
 
-1. The `dns` rule sends the pod's DNS traffic through Cilium's **DNS proxy**. This is an
-   L7 rule too. `matchPattern: "*"` lets the pod resolve any name.
-2. When the answer for `api.github.com` comes back, Cilium records its IPs.
-3. The `toFQDNs` rule allows TCP 443 to exactly those IPs.
+1. **DNS** to `kube-dns`, with a `dns` rule. This sends the pod's DNS queries through
+   Cilium's **DNS proxy**. `matchPattern: "*"` lets the pod resolve any name.
+2. The **API** on port 8080, so the frontend keeps working.
+3. **`api.github.com`** on port 443. When the DNS answer for this name comes back, Cilium
+   records its IPs and allows HTTPS to exactly those IPs.
 
 Without the `dns` rule, Cilium never sees the DNS answers and `toFQDNs` matches nothing.
 
+Test it:
+
 ```bash
-kubectl apply -f cnp-03-web-egress-fqdn.yaml
-
-
-# Allowed domain   expected: HTTP/2 200 (followed by headers)
-kubectl exec -n frontend web -- curl -sI --max-time 3 https://api.github.com
-
-# Any other domain   expected: command terminated with exit code 28 (dropped)
-kubectl exec -n frontend web -- curl -sI --max-time 3 https://example.com
-
-# The API is still allowed   expected: product list
+# Allowed: HTTP/2 200 and the response headers
+kubectl exec -n frontend web -- curl -sI --max-time 5 https://api.github.com
+```
+```bash
+# Timeout (exit code 28): any other site is blocked
+kubectl exec -n frontend web -- curl -sI --max-time 5 https://example.com
+```
+```bash
+# Allowed: the API still works
 kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080/api/products
-
-# Resolving other names still works, connecting to them does not
-kubectl exec -n frontend web -- nslookup example.com
 ```
 
-See the names and IPs Cilium learned, on the agent running next to `web`:
-
-```bash
-NODE=$(kubectl get pod web -n frontend -o jsonpath='{.spec.nodeName}')
-AGENT=$(kubectl get pod -n kube-system -l k8s-app=cilium \
-  --field-selector spec.nodeName="$NODE" -o name)
-
-kubectl -n kube-system exec "$AGENT" -c cilium-agent -- cilium-dbg fqdn cache list
-```
-
-> **Note:** This needs internet access from the kind nodes. If `api.github.com` times
-> out too, check that `curl https://api.github.com` works from your machine first.
-
-## Final Check
-
-With all policies applied, the commands from the steps above give:
-
-| Request | Expected |
-| --- | --- |
-| web → `GET /api/products` | JSON (allowed) |
-| web → `POST /api/orders` | JSON (allowed) |
-| web → `GET /admin` | `Access denied` (L7) |
-| web → `DELETE /api/orders/42` | `Access denied` (L7) |
-| web → `DELETE /api/orders/42` + `X-Team: ops` | JSON (allowed) |
-| intruder → `GET /api/products` | Timeout (L3) |
-| web → `https://api.github.com` | `HTTP/2 200` (allowed) |
-| web → `https://example.com` | Timeout (FQDN) |
-
-## Inspect the Policies
-
-Confirm Cilium accepted the policies (`VALID` should be `True`):
+List the policies. The `VALID` column must be `True` for each of them:
 
 ```bash
 kubectl get cnp -A
 ```
 
-Watch L7 verdicts live on the agent next to the `api` pod, then re-run a few `curl`
-commands in another terminal:
+Final result:
 
-```bash
-NODE=$(kubectl get pod -n backend -l app.kubernetes.io/name=api -o jsonpath='{.items[0].spec.nodeName}')
-AGENT=$(kubectl get pod -n kube-system -l k8s-app=cilium \
-  --field-selector spec.nodeName="$NODE" -o name)
-
-kubectl -n kube-system exec "$AGENT" -c cilium-agent -- cilium-dbg monitor -t l7
-```
-
-Each request is logged with its method, URL and verdict: `Forwarded` for allowed calls,
-`Denied` for the ones that got `Access denied`. The `intruder` requests do not show up here
-because they are dropped before reaching Envoy. Use `cilium-dbg monitor --type drop` for
-those, as in scenario 4. Scenario 6 explores all of this with Hubble.
+| Request from `web` | Result |
+| --- | --- |
+| `GET /api/products`, `POST /api/orders` | allowed |
+| `GET /admin`, `DELETE` without header | `Access denied` (L7) |
+| `DELETE` with `X-Team: ops` | allowed |
+| `https://api.github.com` | allowed |
+| `https://example.com` | timeout (FQDN) |
+| any request from `intruder` | timeout (L3) |
 
 ## Cleanup
 
 Deleting the namespaces also deletes the policies inside them:
 
 ```bash
-kubectl delete -f namespaces.yaml
+kubectl delete namespace frontend backend
 kubectl delete pod intruder -n default
 ```
 

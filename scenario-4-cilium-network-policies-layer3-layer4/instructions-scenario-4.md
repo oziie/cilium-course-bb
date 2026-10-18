@@ -4,31 +4,10 @@
 `CiliumNetworkPolicy`. Select pods by label across namespaces, allow only the ports each
 caller needs, and see that everything else is dropped.
 
-## Prepare the kind cluster (no need for BB)
+## Step 1 — Create the Cluster and Install Cilium
 
-This scenario runs on the same cluster as the previous ones: 1 control-plane + 2 workers
-with Cilium installed. If you are continuing from the previous scenario, skip this section.
-
-Otherwise, create (or reuse) the cluster with the script in this folder:
-
-```bash
-cd scenario-4-cilium-network-policies-layer3-layer4
-./create-kind-cluster.sh
-kubectl config current-context   # should print kind-kind
-```
-
-The script creates the cluster, installs Cilium with the same settings as
-[Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md) and waits until
-all nodes are `Ready`. If Cilium is already installed, it is left as is. Check it with:
-
-```bash
-cilium status
-```
-
-## The Use Case
-
-Three teams each own a namespace. The frontend calls the API, the API reads from the
-database, and nothing else should get through.
+In this scenario you lock down a small three-tier shop with `CiliumNetworkPolicy`. Each
+tier runs in its own namespace, and only the traffic each tier really needs is allowed.
 
 ```
  ns: frontend           ns: backend                   ns: database
@@ -44,97 +23,204 @@ database, and nothing else should get through.
 └─────────────┘
 ```
 
-| File | Contents |
-| --- | --- |
-| [`namespaces.yaml`](namespaces.yaml) | `frontend`, `backend`, `database` namespaces |
-| [`app-api.yaml`](app-api.yaml) | nginx `api` Deployment + Service, listening on 8080 (API) and 9090 (admin) |
-| [`app-redis.yaml`](app-redis.yaml) | `redis` Deployment + Service on 6379 |
-| [`app-clients.yaml`](app-clients.yaml) | `web` pod in `frontend`, `intruder` pod in `default` |
-| [`cnp-01-default-deny.yaml`](cnp-01-default-deny.yaml) | Deny all ingress in `backend` and `database` |
-| [`cnp-02-allow-web-to-api.yaml`](cnp-02-allow-web-to-api.yaml) | `web` → `api` on TCP 8080 |
-| [`cnp-03-allow-api-to-redis.yaml`](cnp-03-allow-api-to-redis.yaml) | `api` → `redis` on TCP 6379 |
-| [`cnp-04-web-egress-no-dns.yaml`](cnp-04-web-egress-no-dns.yaml) | `web` egress limited to `api:8080` (DNS missing on purpose) |
-| [`cnp-04-web-egress.yaml`](cnp-04-web-egress.yaml) | Same, with DNS to `kube-dns` allowed |
+First, build the lab cluster: 1 control-plane and 2 worker nodes, with Cilium as the
+network plugin (CNI).
 
-## Deploy the Applications
+This scenario runs on the same cluster as the previous ones: 1 control-plane + 2 workers
+with Cilium installed. If you are continuing from the previous scenario, the cluster is
+already there. Otherwise, create (or reuse) it with the
+[`create-kind-cluster.sh`](create-kind-cluster.sh) script in this folder:
 
 ```bash
 cd scenario-4-cilium-network-policies-layer3-layer4
-
-kubectl apply -f namespaces.yaml
-kubectl apply -f app-api.yaml -f app-redis.yaml -f app-clients.yaml
-
-kubectl wait --for=condition=Ready pod --all -n backend  --timeout=120s
-kubectl wait --for=condition=Ready pod --all -n database --timeout=120s
-kubectl wait --for=condition=Ready pod/web -n frontend   --timeout=120s
-kubectl wait --for=condition=Ready pod/intruder -n default --timeout=120s
+./create-kind-cluster.sh
+kubectl config current-context   # should print kind-kind
 ```
 
-## Baseline: Everything Can Reach Everything
+The script creates the cluster from [`light-lab.yaml`](light-lab.yaml), installs Cilium
+with the same settings as
+[Scenario 1](../scenario-1-installation-cilium/instructions-scenario-1.md) and waits until
+all nodes are `Ready`. If Cilium is already installed, it is left as is.
 
-Without any policy, Cilium allows all traffic. Each command prints `ALLOWED` or `BLOCKED`.
-A blocked connection is dropped silently, so the commands use a 3-second timeout.
+<details>
+<summary>Manual alternative (the commands used on BB)</summary>
+
+Write the kind configuration file and create the cluster. `disableDefaultCNI: true` turns
+off kind's default network plugin so that Cilium can manage pod networking:
 
 ```bash
-# web -> api public port
-kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080 \
-  && echo ALLOWED || echo BLOCKED
-
-# web -> api admin port
-kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:9090 \
-  && echo ALLOWED || echo BLOCKED
-
-# web -> redis
-kubectl exec -n frontend web -- nc -z -w 3 redis.database 6379 \
-  && echo ALLOWED || echo BLOCKED
-
-# intruder -> api
-kubectl exec -n default intruder -- curl -s --max-time 3 http://api.backend:8080 \
-  && echo ALLOWED || echo BLOCKED
-
-# api -> redis (the nginx alpine image ships busybox nc)
-kubectl exec -n backend deploy/api -- sh -c "printf 'PING\r\n' | nc -w 3 redis.database 6379"
+cat > light-lab.yaml <<EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+- role: worker
+- role: worker
+networking:
+  disableDefaultCNI: true
+EOF
+```
+```bash
+kind create cluster --config light-lab.yaml
 ```
 
-All five succeed: the frontend, and even the intruder, can talk to the database and the
-admin port directly.
+Install Cilium with Helm:
 
-## Step 1 — Default Deny Ingress
+```bash
+helm repo add cilium https://helm.cilium.io/
+```
+```bash
+helm install cilium cilium/cilium -n kube-system \
+  --version 1.18.4 \
+  --set cluster.name=kind-kind \
+  --set ipam.mode=kubernetes \
+  --set operator.replicas=1 \
+  --set routingMode=tunnel \
+  --set tunnelProtocol=vxlan
+```
 
-```yaml
-# cnp-01-default-deny.yaml (backend copy; the database copy is identical)
+</details>
+
+Wait until Cilium is ready, then check the nodes:
+
+```bash
+cilium status --wait
+```
+```bash
+kubectl get nodes
+```
+
+All three nodes must be `Ready`.
+
+## Step 2 — Deploy the Shop and Deny All Ingress
+
+The shop has three tiers, each in its own namespace:
+
+| Namespace | Pod | Role |
+| --- | --- | --- |
+| `frontend` | `web` | the shop frontend, calls the API |
+| `backend` | `api` | nginx with a public API on port **8080** and an admin page on port **9090** |
+| `database` | `redis` | the database on port **6379**, only the API should use it |
+| `default` | `intruder` | an unrelated pod that should be blocked everywhere |
+
+Create the namespaces and the applications:
+
+```bash
+kubectl create namespace frontend
+```
+```bash
+kubectl create namespace backend
+```
+```bash
+kubectl create namespace database
+```
+```bash
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: api-nginx-conf, namespace: backend}
+data:
+  default.conf: |
+    server { listen 8080; location / { return 200 'api: public\n'; } }
+    server { listen 9090; location / { return 200 'api: admin\n'; } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: api, namespace: backend}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: api}}
+  template:
+    metadata: {labels: {app.kubernetes.io/name: api}}
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          volumeMounts: [{name: conf, mountPath: /etc/nginx/conf.d}]
+      volumes: [{name: conf, configMap: {name: api-nginx-conf}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: api, namespace: backend}
+spec:
+  selector: {app.kubernetes.io/name: api}
+  ports: [{name: http, port: 8080}, {name: admin, port: 9090}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: redis, namespace: database}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: redis}}
+  template:
+    metadata: {labels: {app.kubernetes.io/name: redis}}
+    spec:
+      containers: [{name: redis, image: "redis:7-alpine"}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: redis, namespace: database}
+spec:
+  selector: {app.kubernetes.io/name: redis}
+  ports: [{port: 6379}]
+EOF
+```
+```bash
+kubectl run web -n frontend --image=nicolaka/netshoot -l app.kubernetes.io/name=web -- sleep infinity
+```
+```bash
+kubectl run intruder -n default --image=nicolaka/netshoot -l app.kubernetes.io/name=intruder -- sleep infinity
+```
+```bash
+kubectl wait --for=condition=Ready pod --all -A --timeout=180s
+```
+
+**Baseline.** Without any policy, Cilium allows all traffic. Each test prints `ALLOWED` or
+`BLOCKED`. A blocked connection is dropped silently, so the commands give up after 3
+seconds:
+
+```bash
+kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080 && echo ALLOWED || echo BLOCKED
+```
+```bash
+kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:9090 && echo ALLOWED || echo BLOCKED
+```
+```bash
+kubectl exec -n default intruder -- nc -z -w 3 redis.database 6379 && echo ALLOWED || echo BLOCKED
+```
+
+All three are `ALLOWED`: even the intruder can reach the database.
+
+**Default deny.** Apply a policy that selects every pod in `backend` and `database`:
+
+```bash
+for ns in backend database; do
+kubectl apply -f - <<EOF
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
   name: default-deny-ingress
-  namespace: backend
+  namespace: $ns
 spec:
   endpointSelector: {}
   ingress:
     - {}
+EOF
+done
 ```
 
 - `endpointSelector: {}` selects **every pod in the policy's namespace**.
-- The single empty rule `- {}` allows nothing. As soon as a pod is selected by any ingress
-  rule, Cilium switches it to **deny by default** for ingress, and only traffic that some
-  rule explicitly allows gets through.
+- The empty rule `- {}` allows nothing. As soon as a pod is selected by an ingress policy,
+  Cilium switches it to **deny by default**: only traffic that a rule explicitly allows
+  gets in.
+
+Run the three tests above again: all of them are now `BLOCKED`, including the legitimate
+`web` → `api:8080`. You fix that in the next step.
+
+## Step 3 — Allow Only the Traffic the Shop Needs
+
+**Allow the frontend to call the API, on port 8080 only:**
 
 ```bash
-kubectl apply -f cnp-01-default-deny.yaml
-kubectl get cnp -A
-```
-
-Re-run the baseline commands: every connection into `backend` and `database` is now
-`BLOCKED`, including the legitimate ones.
-
-> **Note:** A `CiliumNetworkPolicy` is namespaced and only selects pods in its own
-> namespace. That is why the file contains one copy per namespace. To cover the whole
-> cluster at once, use a `CiliumClusterwideNetworkPolicy`.
-
-## Step 2 — Allow the Frontend to Call the API
-
-```yaml
-# cnp-02-allow-web-to-api.yaml
+kubectl apply -f - <<EOF
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -153,38 +239,37 @@ spec:
         - ports:
             - port: "8080"
               protocol: TCP
+EOF
 ```
 
 - `endpointSelector` picks the **destination**: the `api` pods in `backend`.
-- `fromEndpoints` picks the **source**. Without a namespace label it only matches pods in
-  the policy's own namespace (`backend`). Adding
+- `fromEndpoints` picks the **source**. Without a namespace label it would only match pods
+  in the policy's own namespace (`backend`). The label
   `k8s:io.kubernetes.pod.namespace: frontend` selects the `web` pod in `frontend`.
 - `toPorts` opens **TCP 8080 only**. The admin port 9090 on the same pod stays closed.
 
+Test it:
+
 ```bash
-kubectl apply -f cnp-02-allow-web-to-api.yaml
-
-# web -> api:8080   expected: ALLOWED
-kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080 \
-  && echo ALLOWED || echo BLOCKED
-
-# web -> api:9090   expected: BLOCKED (port not in toPorts)
-kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:9090 \
-  && echo ALLOWED || echo BLOCKED
-
-# intruder -> api:8080   expected: BLOCKED (wrong namespace and labels)
-kubectl exec -n default intruder -- curl -s --max-time 3 http://api.backend:8080 \
-  && echo ALLOWED || echo BLOCKED
+kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080 && echo ALLOWED || echo BLOCKED
+```
+```bash
+kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:9090 && echo ALLOWED || echo BLOCKED
+```
+```bash
+kubectl exec -n default intruder -- curl -s --max-time 3 http://api.backend:8080 && echo ALLOWED || echo BLOCKED
 ```
 
-> **Note:** Policies are additive. `default-deny-ingress` and `allow-web-to-api` both
-> select the `api` pod, and the allowed traffic is the union of their rules. Order does
-> not matter, and there is no "deny wins" between these two.
+Expected: `ALLOWED` for port 8080, `BLOCKED` for the admin port 9090, and `BLOCKED` for
+the intruder (wrong namespace and labels).
 
-## Step 3 — Allow the API to Reach Redis
+Policies are **additive**: `default-deny-ingress` and `allow-web-to-api` both select the
+`api` pod, and what is allowed is the union of their rules.
 
-```yaml
-# cnp-03-allow-api-to-redis.yaml
+**Allow the API to reach Redis, on port 6379 only:**
+
+```bash
+kubectl apply -f - <<EOF
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -203,29 +288,28 @@ spec:
         - ports:
             - port: "6379"
               protocol: TCP
+EOF
 ```
+
+Test it. The API sends a Redis `PING`, and the frontend tries to reach Redis directly:
 
 ```bash
-kubectl apply -f cnp-03-allow-api-to-redis.yaml
-
-# api -> redis   expected: +PONG
 kubectl exec -n backend deploy/api -- sh -c "printf 'PING\r\n' | nc -w 3 redis.database 6379"
-
-# web -> redis   expected: BLOCKED (the frontend must go through the API)
-kubectl exec -n frontend web -- nc -z -w 3 redis.database 6379 \
-  && echo ALLOWED || echo BLOCKED
 ```
+```bash
+kubectl exec -n frontend web -- nc -z -w 3 redis.database 6379 && echo ALLOWED || echo BLOCKED
+```
+
+Expected: the API gets `+PONG` from Redis, and the frontend is `BLOCKED`: it has to go
+through the API.
 
 ## Step 4 — Restrict What the Frontend Can Call (Egress)
 
 So far every policy was **ingress**: it protects the destination. An **egress** policy
-limits what a source can call, which is useful when the frontend is the most exposed part
-of the system.
+limits what a source can call. Limit `web` to the API on port 8080:
 
-First apply a version that looks correct but forgets DNS:
-
-```yaml
-# cnp-04-web-egress-no-dns.yaml
+```bash
+kubectl apply -f - <<EOF
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -244,29 +328,47 @@ spec:
         - ports:
             - port: "8080"
               protocol: TCP
+EOF
 ```
+
+Call the API by name, then by its Service IP:
 
 ```bash
-kubectl apply -f cnp-04-web-egress-no-dns.yaml
-
-# By name   expected: BLOCKED (the DNS lookup itself is dropped)
-kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080 \
-  && echo ALLOWED || echo BLOCKED
-
-# By Service IP   expected: ALLOWED (no DNS needed)
+kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080 && echo ALLOWED || echo BLOCKED
+```
+```bash
 API_IP=$(kubectl get svc api -n backend -o jsonpath='{.spec.clusterIP}')
-kubectl exec -n frontend web -- curl -s --max-time 3 "http://${API_IP}:8080" \
-  && echo ALLOWED || echo BLOCKED
+kubectl exec -n frontend web -- curl -s --max-time 3 http://$API_IP:8080 && echo ALLOWED || echo BLOCKED
 ```
 
-The `web` pod is now in deny-by-default for **egress**, and its DNS queries to `kube-dns`
-in `kube-system` are not on the allow list. This is the most common mistake with egress
-policies.
+By name it is `BLOCKED`, by IP it is `ALLOWED`. Why? `web` is now in deny-by-default for
+egress, and its **DNS queries** to `kube-dns` are not on the allow list, so the name
+`api.backend` can no longer be resolved. Forgetting DNS is the most common mistake with
+egress policies.
 
-Fix it by allowing UDP and TCP 53 to `kube-dns`:
+Fix it by applying the same policy with a second rule that allows DNS (UDP and TCP 53)
+to `kube-dns`. The policy has the same name, so it replaces the previous one:
 
-```yaml
-# cnp-04-web-egress.yaml (only the added rule is shown)
+```bash
+kubectl apply -f - <<EOF
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: web-egress
+  namespace: frontend
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: backend
+            app.kubernetes.io/name: api
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
     - toEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: kube-system
@@ -277,87 +379,36 @@ Fix it by allowing UDP and TCP 53 to `kube-dns`:
               protocol: UDP
             - port: "53"
               protocol: TCP
+EOF
 ```
-
 ```bash
-kubectl apply -f cnp-04-web-egress.yaml   # same name, replaces the no-dns version
-
-# expected: ALLOWED
-kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080 \
-  && echo ALLOWED || echo BLOCKED
+kubectl exec -n frontend web -- curl -s --max-time 3 http://api.backend:8080 && echo ALLOWED || echo BLOCKED
 ```
 
-> **Note:** Traffic to a Service is checked against the **backend pod** it is load-balanced
-> to, not the ClusterIP. That is why `toEndpoints` matching the `api` pod labels also
-> covers `http://api.backend:8080`.
+Calling by name is `ALLOWED` again.
 
-## Final Check
-
-```bash
-check() {  # usage: check <description> <namespace> <pod|deploy/name> <command...>
-  local desc="$1" ns="$2" pod="$3"; shift 3
-  if kubectl exec -n "$ns" "$pod" -- "$@" >/dev/null 2>&1; then
-    printf '%-28s ALLOWED\n' "$desc"
-  else
-    printf '%-28s BLOCKED\n' "$desc"
-  fi
-}
-
-check "web -> api:8080"      frontend web      curl -s --max-time 3 http://api.backend:8080
-check "web -> api:9090"      frontend web      curl -s --max-time 3 http://api.backend:9090
-check "web -> redis:6379"    frontend web      nc -z -w 3 redis.database 6379
-check "intruder -> api:8080" default  intruder curl -s --max-time 3 http://api.backend:8080
-check "intruder -> redis"    default  intruder nc -z -w 3 redis.database 6379
-check "api -> redis:6379"    backend  deploy/api \
-  sh -c "printf 'PING\r\n' | nc -w 3 redis.database 6379 | grep -q PONG"
-```
-
-| Path | Expected |
-| --- | --- |
-| web → api:8080 | ALLOWED |
-| web → api:9090 | BLOCKED |
-| web → redis:6379 | BLOCKED |
-| intruder → api:8080 | BLOCKED |
-| intruder → redis | BLOCKED |
-| api → redis:6379 | ALLOWED |
-
-## Inspect the Policies
-
-List the policies and confirm Cilium accepted them (`VALID` should be `True`):
+List all the policies. The `VALID` column must be `True` for each of them:
 
 ```bash
 kubectl get cnp -A
 ```
 
-Check enforcement per endpoint. Each Cilium agent only knows the endpoints on its own
-node, so run this on the agent next to the pod you are interested in:
+Final result:
 
-```bash
-NODE=$(kubectl get pod -n backend -l app.kubernetes.io/name=api -o jsonpath='{.items[0].spec.nodeName}')
-AGENT=$(kubectl get pod -n kube-system -l k8s-app=cilium \
-  --field-selector spec.nodeName="$NODE" -o name)
-
-kubectl -n kube-system exec "$AGENT" -c cilium-agent -- cilium-dbg endpoint list
-```
-
-The `POLICY (ingress) ENFORCEMENT` column shows `Enabled` for `api` and `redis`, and
-`POLICY (egress) ENFORCEMENT` shows `Enabled` for `web`.
-
-Watch drops live while you re-run a blocked command in another terminal:
-
-```bash
-kubectl -n kube-system exec "$AGENT" -c cilium-agent -- cilium-dbg monitor --type drop
-```
-
-You should see `Policy denied` drops for the blocked connections. Scenario 6 explores this
-in depth with Hubble.
+| Path | Result |
+| --- | --- |
+| web → api:8080 | ALLOWED |
+| web → api:9090 | BLOCKED |
+| web → redis:6379 | BLOCKED |
+| intruder → api / redis | BLOCKED |
+| api → redis:6379 | ALLOWED |
 
 ## Cleanup
 
 Deleting the namespaces also deletes the policies inside them:
 
 ```bash
-kubectl delete -f namespaces.yaml
+kubectl delete namespace frontend backend database
 kubectl delete pod intruder -n default
 ```
 
