@@ -99,7 +99,7 @@ cilium status --wait
 Ayarları kontrol edin:
 
 ```bash
-cilium config view | grep -E 'kube-proxy-replacement |enable-bpf-masquerade|enable-ipv4-egress-gateway'
+cilium config view | grep -E 'kube-proxy-replacement |enable-bpf-masquerade|enable-egress-gateway'
 ```
 
 Üç ayar da `true` değerindedir.

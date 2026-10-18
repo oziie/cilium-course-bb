@@ -97,7 +97,7 @@ cilium status --wait
 Check the settings:
 
 ```bash
-cilium config view | grep -E 'kube-proxy-replacement |enable-bpf-masquerade|enable-ipv4-egress-gateway'
+cilium config view | grep -E 'kube-proxy-replacement |enable-bpf-masquerade|enable-egress-gateway'
 ```
 
 All three settings are `true`.
