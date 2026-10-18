@@ -33,7 +33,7 @@ The outside world sees one IP, wherever the pod runs.
 The IPs above are examples; you will see your own in Step 2.
 
 Like Scenarios 8 and 9, the Egress Gateway needs a cluster **without kube-proxy**.
-Delete any previous cluster, then create the new one:
+If exists, delete any previous cluster, then create the new one:
 
 ```bash
 kind delete cluster --name kind

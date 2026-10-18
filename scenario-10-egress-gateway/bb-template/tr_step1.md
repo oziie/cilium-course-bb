@@ -34,7 +34,7 @@ ile dışarı çıkarır. Pod nerede çalışırsa çalışsın dış dünya tek
 Yukarıdaki IP'ler örnektir; kendi değerlerinizi 2. adımda göreceksiniz.
 
 Senaryo 8 ve 9'daki gibi Egress Gateway de **kube-proxy olmayan** bir küme gerektirir.
-Önceki kümeyi silin, ardından yenisini oluşturun:
+Eğer varsa, önceki kümeyi silin, ardından yenisini oluşturun:
 
 ```bash
 kind delete cluster --name kind
