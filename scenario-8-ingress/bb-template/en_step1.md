@@ -12,7 +12,7 @@ cluster. Three Cilium features work together:
 | LB-IPAM (`CiliumLoadBalancerIPPool`) | gives `LoadBalancer` Services an external IP from a pool you define |
 | L2 announcements (`CiliumL2AnnouncementPolicy`) | makes a node answer ARP requests for that IP, so the machine running kind can reach it |
 
-This scenario needs a cluster **without kube-proxy**: Cilium replaces it.`kubeProxyMode: none` tells kind not to
+This scenario needs a cluster **without kube-proxy**: Cilium replaces it. `kubeProxyMode: none` tells kind not to
 install kube-proxy:
 
 ```bash

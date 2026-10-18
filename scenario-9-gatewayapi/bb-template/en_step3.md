@@ -51,7 +51,7 @@ It prints `True`.
 again with the `GATEWAY_IP=...` command of step 2.
 
 ```bash
-echo $INGRESS_IP
+echo $GATEWAY_IP
 ```
 
 `/` goes to `productpage` and returns HTTP code `200`:
